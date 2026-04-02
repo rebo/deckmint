@@ -6,7 +6,7 @@ description = "Create PowerPoint presentations programmatically in Rust"
 license = "MIT"
 repository = "https://github.com/rebo/deckmint"
 keywords = ["powerpoint", "pptx", "presentation", "office", "ooxml"]
-categories = ["encoding", "file-formats"]
+categories = ["encoding", "parser-implementations"]
 
 [dependencies]
 zip = { version = "2", default-features = false, features = ["deflate"] }

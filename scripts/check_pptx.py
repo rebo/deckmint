@@ -317,7 +317,15 @@ def check_transition_xml(zf, xml_path):
             issues.append(f'<p:{el} dir="l"> — "l" is the default direction; omit dir attribute')
             break  # one report is enough
 
-    # 3. Invalid connector preset geometry names
+    # 3. <p:checkerboard> is not a valid OOXML element — use <p:checker>
+    if "<p:checkerboard" in xml:
+        issues.append('<p:checkerboard> — invalid element; use <p:checker> for checkerboard transition')
+
+    # 4. <p:flash> is not in the base OOXML schema — use <p14:flash> in mc:AlternateContent
+    if re.search(r'<p:flash\s*/?\s*>', xml) and 'p14:flash' not in xml:
+        issues.append('<p:flash> — not a valid p: element; use <p14:flash> in mc:AlternateContent')
+
+    # 5. Invalid connector preset geometry names
     for bad_prst in ("elbow", "curve"):
         if re.search(rf'<a:prstGeom\b[^>]*prst="{bad_prst}"', xml):
             correct = "bentConnector3" if bad_prst == "elbow" else "curvedConnector3"
@@ -710,6 +718,70 @@ def check_duplicate_rel_targets(zf, names):
     ok(f"Duplicate rels targets: checked {len(all_rels)} rels file(s)")
 
 
+def check_presentation_slide_rids(zf, names):
+    """
+    Verify that slide rIds in presentation.xml match the rIds in
+    presentation.xml.rels. A mismatch (e.g. after slide removal) causes
+    PowerPoint to trigger the repair dialog.
+    """
+    pres_path = "ppt/presentation.xml"
+    rels_path = "ppt/_rels/presentation.xml.rels"
+    if pres_path not in names or rels_path not in names:
+        return
+
+    # Get slide rIds from presentation.xml sldIdLst
+    tree = ET.parse(zf.open(pres_path))
+    root = tree.getroot()
+    sld_ids = root.findall(".//p:sldIdLst/p:sldId", NS)
+    pres_rids = {}
+    for el in sld_ids:
+        rid = el.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+        sid = el.get("id")
+        if rid:
+            pres_rids[rid] = sid
+
+    # Get slide rIds from presentation.xml.rels
+    rels = _parse_rels(zf, rels_path)
+    rels_slide_rids = {}
+    for rid, (typ, target, _mode) in rels.items():
+        if "/relationships/slide" in typ and "slideMaster" not in target and "slideLayout" not in target:
+            rels_slide_rids[rid] = target
+
+    # Each rId in presentation.xml must exist in the rels
+    for rid, sid in pres_rids.items():
+        if rid not in rels_slide_rids:
+            err(f"{pres_path}: sldId id=\"{sid}\" references {rid} which is not a slide relationship in {rels_path}")
+
+    ok(f"Presentation slide rIds: {len(pres_rids)} slide(s) verified")
+
+
+VALID_UNDERLINE_VALUES = {
+    "none", "words", "sng", "dbl", "heavy",
+    "dotted", "dottedHeavy",
+    "dash", "dashHeavy", "dashLong", "dashLongHeavy",
+    "dotDash", "dotDashHeavy",
+    "wavy", "wavyHeavy", "wavyDbl",
+}
+
+
+def check_underline_values(zf, names):
+    """
+    Validate that all u= attributes on <a:rPr> use valid ST_TextUnderlineType values.
+    Invalid values like "heavyDash" (should be "dashHeavy") cause PowerPoint to strip
+    the underline during repair.
+    """
+    slide_paths = sorted(n for n in names if n.startswith("ppt/slides/slide") and n.endswith(".xml"))
+    checked = 0
+    for path in slide_paths:
+        xml = zf.read(path).decode("utf-8", errors="replace")
+        for m in re.finditer(r'<a:rPr\b[^>]*\bu="([^"]+)"', xml):
+            val = m.group(1)
+            checked += 1
+            if val not in VALID_UNDERLINE_VALUES:
+                err(f"{path}: invalid underline value u=\"{val}\" — not a valid ST_TextUnderlineType")
+    ok(f"Underline values: checked {checked} attribute(s) across {len(slide_paths)} slide(s)")
+
+
 def check_chart_xml(zf, chart_path):
     """Catch invalid chart XML patterns that trigger PowerPoint repair."""
     try:
@@ -868,6 +940,14 @@ def main():
 
     # No duplicate rels targets within a single rels file
     check_duplicate_rel_targets(zf, names)
+    print()
+
+    # Slide rIds in presentation.xml must match presentation.xml.rels
+    check_presentation_slide_rids(zf, names)
+    print()
+
+    # Invalid underline style values
+    check_underline_values(zf, names)
     print()
 
     zf.close()

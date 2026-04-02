@@ -69,7 +69,7 @@ pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
 
     // ── Slide master ─────────────────────────────────────
     add_file!("ppt/slideMasters/slideMaster1.xml", pres_xml::make_xml_master(pres));
-    add_file!("ppt/slideMasters/_rels/slideMaster1.xml.rels", rels_xml::make_xml_master_rel(pres.slide_layouts.len()));
+    // Master rels are written after media dedup below (needs master_media_targets).
 
     // ── Notes master ─────────────────────────────────────
     add_file_str!("ppt/notesMasters/notesMaster1.xml", pres_xml::make_xml_notes_master().as_bytes());
@@ -77,8 +77,15 @@ pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
 
     // Pre-compute global sequential media targets with deduplication.
     // Media items with identical bytes reuse the same target path.
+    // Include master media first, then slide media.
     let mut global_media_idx = 0u32;
     let mut flat_media: Vec<&crate::objects::SlideRelMedia> = Vec::new();
+    let master_media_count = if let Some(ref m) = pres.master {
+        for media in &m.rels_media { flat_media.push(media); }
+        m.rels_media.len()
+    } else {
+        0
+    };
     for slide in &pres.slides {
         for media in &slide.rels_media {
             flat_media.push(media);
@@ -102,8 +109,9 @@ pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
             media_target_for.push(format!("../media/{prefix}{global_media_idx}.{}", media.extn));
         }
     }
-    // Split back into per-slide targets
-    let mut flat_idx = 0;
+    // Split master targets from slide targets
+    let master_media_targets: Vec<String> = media_target_for[..master_media_count].to_vec();
+    let mut flat_idx = master_media_count;
     let slide_media_targets: Vec<Vec<String>> = pres.slides.iter().map(|slide| {
         let targets: Vec<String> = slide.rels_media.iter().map(|_| {
             let t = media_target_for[flat_idx].clone();
@@ -112,6 +120,19 @@ pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
         }).collect();
         targets
     }).collect();
+
+    // ── Slide master rels (written here because we need master_media_targets) ──
+    {
+        let layout_count = pres.slide_layouts.len();
+        let rid_offset = (layout_count + 1) as u32;
+        let (master_rels, master_rels_media) = if let Some(ref m) = pres.master {
+            (&m.rels[..], &m.rels_media[..])
+        } else {
+            (&[][..], &[][..])
+        };
+        add_file!("ppt/slideMasters/_rels/slideMaster1.xml.rels",
+            rels_xml::make_xml_master_rel(layout_count, master_rels, master_rels_media, &master_media_targets, rid_offset));
+    }
 
     // Pre-compute global sequential chart targets (chart1, chart2, … across all slides)
     let mut global_chart_idx = 0u32;
@@ -155,6 +176,19 @@ pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
     // ── Media files (deduplicated) ─────────────────────
     let mut written_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut flat_idx2 = 0usize;
+    // Master media first
+    if let Some(ref m) = pres.master {
+        for media in &m.rels_media {
+            let target = &media_target_for[flat_idx2];
+            flat_idx2 += 1;
+            let zip_path = format!("ppt/{}", target.trim_start_matches("../"));
+            if written_paths.insert(zip_path.clone()) {
+                zip.start_file(&zip_path, opts).map_err(PptxError::Zip)?;
+                zip.write_all(&media.data).map_err(PptxError::Io)?;
+            }
+        }
+    }
+    // Slide media
     for slide in &pres.slides {
         for media in &slide.rels_media {
             let target = &media_target_for[flat_idx2];

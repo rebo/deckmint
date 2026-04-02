@@ -12,7 +12,7 @@ fn main() {
     slide.add_text(
         "Grid Layout Demo",
         TextOptionsBuilder::new()
-            .pos(0.5, 0.2).size(9.0, 0.7)
+            .bounds(0.5, 0.2, 9.0, 0.7)
             .font_size(24.0).bold()
             .build(),
     );
@@ -23,7 +23,7 @@ fn main() {
         .container(9.0, 4.2)
         .build();
 
-    let colors = ["4472C4", "ED7D31", "70AD47", "FFC000", "5B9BD5", "A9D18E"];
+    let colors = ["#4472C4", "#ED7D31", "#70AD47", "#FFC000", "#5B9BD5", "#A9D18E"];
     let labels = ["Cell 1", "Cell 2", "Cell 3", "Cell 4", "Cell 5", "Cell 6"];
 
     for row in 0..2 {
@@ -34,7 +34,7 @@ fn main() {
             slide.add_shape(
                 ShapeType::RoundRect,
                 ShapeOptionsBuilder::new()
-                    .pos(cell.x, cell.y).size(cell.w, cell.h)
+                    .rect(cell)
                     .fill_color(colors[idx])
                     .rect_radius(0.1)
                     .build(),
@@ -42,9 +42,9 @@ fn main() {
             slide.add_text(
                 labels[idx],
                 TextOptionsBuilder::new()
-                    .pos(cell.x, cell.y).size(cell.w, cell.h)
+                    .rect(cell)
                     .font_size(18.0).bold()
-                    .color("FFFFFF")
+                    .color("#FFFFFF")
                     .align(AlignH::Center).valign(AlignV::Middle)
                     .build(),
             );

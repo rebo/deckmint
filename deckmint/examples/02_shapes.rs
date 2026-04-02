@@ -13,7 +13,7 @@ fn main() {
     slide.add_text(
         "Shape Gallery",
         TextOptionsBuilder::new()
-            .pos(0.5, 0.3).size(9.0, 0.8)
+            .bounds(0.5, 0.3, 9.0, 0.8)
             .font_size(28.0).bold()
             .build(),
     );
@@ -22,8 +22,8 @@ fn main() {
     slide.add_shape(
         ShapeType::Rect,
         ShapeOptionsBuilder::new()
-            .pos(0.5, 1.5).size(2.5, 2.0)
-            .fill_color("4472C4")
+            .bounds(0.5, 1.5, 2.5, 2.0)
+            .fill_color("#4472C4")
             .shadow(ShadowProps::outer().with_blur(6.0).with_offset(4.0))
             .build(),
     );
@@ -32,8 +32,8 @@ fn main() {
     slide.add_shape(
         ShapeType::RoundRect,
         ShapeOptionsBuilder::new()
-            .pos(3.5, 1.5).size(2.5, 2.0)
-            .gradient_fill(GradientFill::two_color(90.0, "4472C4", "70AD47"))
+            .bounds(3.5, 1.5, 2.5, 2.0)
+            .gradient_fill(GradientFill::two_color(90.0, "#4472C4", "#70AD47"))
             .rect_radius(0.2)
             .build(),
     );
@@ -42,8 +42,8 @@ fn main() {
     slide.add_shape(
         ShapeType::Ellipse,
         ShapeOptionsBuilder::new()
-            .pos(6.5, 1.5).size(2.5, 2.0)
-            .fill_color("ED7D31")
+            .bounds(6.5, 1.5, 2.5, 2.0)
+            .fill_color("#ED7D31")
             .hyperlink(HyperlinkProps::url("https://github.com").with_tooltip("GitHub"))
             .build(),
     );
@@ -52,8 +52,8 @@ fn main() {
     slide.add_shape(
         ShapeType::Triangle,
         ShapeOptionsBuilder::new()
-            .pos(2.0, 4.0).size(2.0, 2.0)
-            .fill_color("A9D18E")
+            .bounds(2.0, 4.0, 2.0, 2.0)
+            .fill_color("#A9D18E")
             .rotate(45.0)
             .build(),
     );
@@ -62,9 +62,9 @@ fn main() {
     slide.add_shape(
         ShapeType::Diamond,
         ShapeOptionsBuilder::new()
-            .pos(5.5, 4.0).size(2.0, 2.0)
-            .fill_color("FFC000")
-            .shadow(ShadowProps::inner().with_color("000000").with_blur(8.0))
+            .bounds(5.5, 4.0, 2.0, 2.0)
+            .fill_color("#FFC000")
+            .shadow(ShadowProps::inner().with_color("#000000").with_blur(8.0))
             .build(),
     );
 

@@ -17,27 +17,27 @@ fn main() {
     // Slide 1: Column chart
     let s = pres.add_slide();
     s.add_text("Column Chart", TextOptionsBuilder::new()
-        .pos(0.5, 0.2).size(9.0, 0.7).font_size(24.0).bold().build());
+        .bounds(0.5, 0.2, 9.0, 0.7).font_size(24.0).bold().build());
     s.add_chart(
         ChartType::Bar,
         series.clone(),
         ChartOptionsBuilder::new()
-            .pos(0.5, 1.0).size(9.0, 4.3)
+            .bounds(0.5, 1.0, 9.0, 4.3)
             .title("Quarterly Revenue")
             .show_value()
-            .chart_colors(vec!["4472C4", "ED7D31"])
+            .chart_colors(vec!["#4472C4", "#ED7D31"])
             .build(),
     );
 
     // Slide 2: Horizontal bar chart
     let s = pres.add_slide();
     s.add_text("Horizontal Bar", TextOptionsBuilder::new()
-        .pos(0.5, 0.2).size(9.0, 0.7).font_size(24.0).bold().build());
+        .bounds(0.5, 0.2, 9.0, 0.7).font_size(24.0).bold().build());
     s.add_chart(
         ChartType::Bar,
         series.clone(),
         ChartOptionsBuilder::new()
-            .pos(0.5, 1.0).size(9.0, 4.3)
+            .bounds(0.5, 1.0, 9.0, 4.3)
             .title("Quarterly Revenue (Bar)")
             .bar_dir(BarDir::Bar)
             .legend_pos(LegendPos::Bottom)
@@ -50,27 +50,27 @@ fn main() {
     ];
     let s = pres.add_slide();
     s.add_text("Pie Chart", TextOptionsBuilder::new()
-        .pos(0.5, 0.2).size(9.0, 0.7).font_size(24.0).bold().build());
+        .bounds(0.5, 0.2, 9.0, 0.7).font_size(24.0).bold().build());
     s.add_chart(
         ChartType::Pie,
         pie_series,
         ChartOptionsBuilder::new()
-            .pos(1.0, 1.0).size(8.0, 4.3)
+            .bounds(1.0, 1.0, 8.0, 4.3)
             .title("Market Share")
             .show_value()
-            .chart_colors(vec!["4472C4", "ED7D31", "70AD47", "FFC000"])
+            .chart_colors(vec!["#4472C4", "#ED7D31", "#70AD47", "#FFC000"])
             .build(),
     );
 
     // Slide 4: Line chart
     let s = pres.add_slide();
     s.add_text("Line Chart", TextOptionsBuilder::new()
-        .pos(0.5, 0.2).size(9.0, 0.7).font_size(24.0).bold().build());
+        .bounds(0.5, 0.2, 9.0, 0.7).font_size(24.0).bold().build());
     s.add_chart(
         ChartType::Line,
         series,
         ChartOptionsBuilder::new()
-            .pos(0.5, 1.0).size(9.0, 4.3)
+            .bounds(0.5, 1.0, 9.0, 4.3)
             .title("Trend Analysis")
             .line_smooth()
             .cat_axis_title("Quarter")

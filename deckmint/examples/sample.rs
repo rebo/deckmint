@@ -15,7 +15,7 @@ fn main() {
         TextOptionsBuilder::new()
             .x(0.5).y(0.5).w(9.0).h(1.5)
             .font_size(48.0).bold().align(AlignH::Center)
-            .color("4472C4")
+            .color("#4472C4")
             .build(),
     );
     s1.add_text(
@@ -29,7 +29,7 @@ fn main() {
         ShapeType::Rect,
         ShapeOptionsBuilder::new()
             .x(0.5).y(4.0).w(9.0).h(0.1)
-            .fill_color("4472C4")
+            .fill_color("#4472C4")
             .build(),
     );
     s1.add_notes("This is slide 1 speaker notes.");
@@ -59,13 +59,13 @@ fn main() {
 
     // Slide 3: dark background + white text
     let s3 = pres.add_slide();
-    s3.set_background_color("1F3864");
+    s3.set_background_color("#1F3864");
     s3.add_text(
         "Dark Slide",
         TextOptionsBuilder::new()
             .x(0.5).y(2.0).w(9.0).h(1.5)
             .font_size(40.0).bold().align(AlignH::Center)
-            .color("FFFFFF")
+            .color("#FFFFFF")
             .build(),
     );
 

@@ -46,9 +46,9 @@ impl TableCell {
         TableCell { text: Vec::new(), options: TableCellProps::default(), is_merged: true }
     }
 
-    /// Set the cell background to a solid color, 6-digit hex, no `#` prefix.
+    /// Set the cell background to a solid color as hex (e.g. `"#4472C4"` or `"4472C4"`).
     pub fn fill(mut self, c: impl Into<String>) -> Self {
-        self.options.fill = Some(c.into());
+        self.options.fill = Some(c.into().trim_start_matches('#').to_uppercase());
         self
     }
 
@@ -314,6 +314,14 @@ impl TableOptionsBuilder {
     pub fn size(self, w: f64, h: f64) -> Self {
         self.w(w).h(h)
     }
+    /// Set position and size from a [`CellRect`](crate::layout::CellRect).
+    pub fn rect(self, r: crate::layout::CellRect) -> Self {
+        self.pos(r.x, r.y).size(r.w, r.h)
+    }
+    /// Set position (x, y) and size (w, h) in inches in a single call.
+    pub fn bounds(self, x: f64, y: f64, w: f64, h: f64) -> Self {
+        self.pos(x, y).size(w, h)
+    }
     /// Set individual column widths in inches.
     pub fn col_w(mut self, widths: Vec<f64>) -> Self { self.opts.col_w = Some(widths); self }
     /// Set individual row heights in inches.
@@ -322,8 +330,8 @@ impl TableOptionsBuilder {
     pub fn font_size(mut self, pt: f64) -> Self { self.opts.font_size = Some(pt); self }
     /// Set the default font family name.
     pub fn font_face(mut self, f: impl Into<String>) -> Self { self.opts.font_face = Some(f.into()); self }
-    /// Set the default background color, 6-digit hex, no `#` prefix.
-    pub fn fill(mut self, c: impl Into<String>) -> Self { self.opts.fill = Some(c.into()); self }
+    /// Set the default background color as hex (e.g. `"#4472C4"` or `"4472C4"`).
+    pub fn fill(mut self, c: impl Into<String>) -> Self { self.opts.fill = Some(c.into().trim_start_matches('#').to_uppercase()); self }
     /// Set the default gradient background fill.
     pub fn gradient_fill(mut self, g: GradientFill) -> Self { self.opts.gradient_fill = Some(g); self }
     /// Set the default horizontal text alignment.

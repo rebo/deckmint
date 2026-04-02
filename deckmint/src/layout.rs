@@ -17,7 +17,9 @@
 //!     .build();
 //!
 //! let r = grid.cell(0, 0);  // left column
-//! // use r.x, r.y, r.w, r.h with any builder
+//! // use r.x, r.y, r.w, r.h with any builder,
+//! // or pass the cell directly with `.rect()`:
+//! // TextOptionsBuilder::new().rect(r).font_size(14.0).build()
 //! ```
 
 use crate::types::{Coord, PositionProps, PresLayout};
@@ -96,6 +98,12 @@ impl CellRect {
             CellRect { x: self.x, y: self.y, w: self.w, h: half_h },
             CellRect { x: self.x, y: self.y + half_h + gap, w: self.w, h: half_h },
         )
+    }
+}
+
+impl From<CellRect> for PositionProps {
+    fn from(r: CellRect) -> Self {
+        r.to_position_props()
     }
 }
 
@@ -281,6 +289,20 @@ impl GridLayoutBuilder {
             .col_gap(gap)
     }
 
+    /// Create a builder whose origin and container match the given cell.
+    ///
+    /// Ideal for nesting a sub-grid inside a parent grid cell:
+    /// ```rust,no_run
+    /// # use deckmint::layout::{GridLayoutBuilder, GridTrack};
+    /// # let outer = GridLayoutBuilder::grid_n_m(2, 2, 0.2).build();
+    /// let inner = GridLayoutBuilder::within(outer.cell(0, 1))
+    ///     .cols(vec![GridTrack::Fr(1.0), GridTrack::Fr(1.0)])
+    ///     .build();
+    /// ```
+    pub fn within(cell: CellRect) -> Self {
+        Self::new().origin(cell.x, cell.y).container(cell.w, cell.h)
+    }
+
     /// Fixed header + flexible content area + fixed footer rows, single column.
     pub fn header_footer(header_h: f64, footer_h: f64, gap: f64) -> Self {
         GridLayoutBuilder::new()
@@ -440,6 +462,13 @@ impl GridLayout {
         let nc = self.num_cols();
         let nr = self.num_rows();
         (0..nr).flat_map(move |r| (0..nc).map(move |c| self.cell(c, r)))
+    }
+
+    /// Create a [`GridLayoutBuilder`] scoped to a single cell.
+    ///
+    /// Shorthand for `GridLayoutBuilder::within(self.cell(col, row))`.
+    pub fn sub_grid(&self, col: usize, row: usize) -> GridLayoutBuilder {
+        GridLayoutBuilder::within(self.cell(col, row))
     }
 
     /// Iterate cells in row-major order, skipping the first `skip_rows` rows.
@@ -895,5 +924,50 @@ mod tests {
         assert!(matches!(pp.y, Some(Coord::Inches(v)) if approx(v, 2.0)));
         assert!(matches!(pp.w, Some(Coord::Inches(v)) if approx(v, 4.0)));
         assert!(matches!(pp.h, Some(Coord::Inches(v)) if approx(v, 1.25)));
+    }
+
+    // ── New: within / sub_grid / From<CellRect> ─────────────────────────
+
+    #[test]
+    fn within_matches_manual_origin_container() {
+        let cell = CellRect { x: 2.0, y: 1.5, w: 6.0, h: 3.0 };
+        let manual = GridLayoutBuilder::new()
+            .origin(cell.x, cell.y)
+            .container(cell.w, cell.h)
+            .cols(vec![GridTrack::Fr(1.0), GridTrack::Fr(1.0)])
+            .build();
+        let via_within = GridLayoutBuilder::within(cell)
+            .cols(vec![GridTrack::Fr(1.0), GridTrack::Fr(1.0)])
+            .build();
+        let m = manual.cell(0, 0);
+        let w = via_within.cell(0, 0);
+        assert!(approx(m.x, w.x) && approx(m.y, w.y));
+        assert!(approx(m.w, w.w) && approx(m.h, w.h));
+    }
+
+    #[test]
+    fn sub_grid_delegates_to_within() {
+        let outer = GridLayoutBuilder::grid_n_m(2, 2, 0.2)
+            .container(8.0, 6.0)
+            .origin(1.0, 0.5)
+            .build();
+        let via_within = GridLayoutBuilder::within(outer.cell(1, 0))
+            .cols(vec![GridTrack::Fr(1.0); 3])
+            .build();
+        let via_sub = outer.sub_grid(1, 0)
+            .cols(vec![GridTrack::Fr(1.0); 3])
+            .build();
+        let a = via_within.cell(1, 0);
+        let b = via_sub.cell(1, 0);
+        assert!(approx(a.x, b.x) && approx(a.y, b.y));
+        assert!(approx(a.w, b.w) && approx(a.h, b.h));
+    }
+
+    #[test]
+    fn from_cellrect_for_position_props() {
+        let r = CellRect { x: 3.0, y: 1.0, w: 5.0, h: 2.5 };
+        let pp: PositionProps = r.into();
+        assert!(matches!(pp.x, Some(Coord::Inches(v)) if approx(v, 3.0)));
+        assert!(matches!(pp.w, Some(Coord::Inches(v)) if approx(v, 5.0)));
     }
 }

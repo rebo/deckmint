@@ -1276,27 +1276,21 @@ pub fn gen_xml_transition(slide: &Slide) -> String {
         .map(|d| format!(" dir=\"{}\"", d.as_str()))
         .unwrap_or_default();
 
-    // Inner transition element
-    let inner = match &props.transition_type {
+    // Classify: some transitions are p14 extensions requiring mc:AlternateContent wrappers
+    let is_p14 = matches!(&props.transition_type,
+        TransitionType::Flash | TransitionType::Vortex | TransitionType::Ripple |
+        TransitionType::Glitter | TransitionType::Honeycomb | TransitionType::Shred |
+        TransitionType::Switch | TransitionType::Flip | TransitionType::Pan |
+        TransitionType::Ferris | TransitionType::Gallery | TransitionType::Conveyor |
+        TransitionType::Doors | TransitionType::Box | TransitionType::Zoom
+    );
+    let is_p15 = matches!(&props.transition_type, TransitionType::Morph);
+
+    // Inner transition element for standard p: namespace
+    let standard_inner = match &props.transition_type {
         TransitionType::None => return String::new(),
         TransitionType::Cut    => "<p:cut/>".to_string(),
         TransitionType::Fade   => "<p:fade/>".to_string(),
-        TransitionType::Flash  => "<p:flash/>".to_string(),
-        TransitionType::Morph  => "<p:morph/>".to_string(),
-        TransitionType::Zoom   => "<p:zoom/>".to_string(),
-        TransitionType::Vortex => "<p:vortex/>".to_string(),
-        TransitionType::Ripple => "<p:ripple/>".to_string(),
-        TransitionType::Glitter=> "<p:glitter/>".to_string(),
-        TransitionType::Honeycomb => "<p:honeycomb/>".to_string(),
-        TransitionType::Shred  => "<p:shred/>".to_string(),
-        TransitionType::Switch => "<p:switch/>".to_string(),
-        TransitionType::Flip   => "<p:flip/>".to_string(),
-        TransitionType::Pan    => format!("<p:pan{dir_attr}/>"),
-        TransitionType::Ferris => format!("<p:ferris{dir_attr}/>"),
-        TransitionType::Gallery=> format!("<p:gallery{dir_attr}/>"),
-        TransitionType::Conveyor=> format!("<p:conveyor{dir_attr}/>"),
-        TransitionType::Doors  => format!("<p:doors{dir_attr}/>"),
-        TransitionType::Box    => format!("<p:box{dir_attr}/>"),
         TransitionType::Push   => format!("<p:push{dir_attr}/>"),
         TransitionType::Wipe   => format!("<p:wipe{dir_attr}/>"),
         TransitionType::Cover  => format!("<p:cover{dir_attr}/>"),
@@ -1311,7 +1305,7 @@ pub fn gen_xml_transition(slide: &Slide) -> String {
         TransitionType::Wheel   => "<p:wheel spokes=\"4\"/>".to_string(),
         TransitionType::Checker => {
             let vert = matches!(props.direction, Some(TransitionDir::Up) | Some(TransitionDir::Down));
-            format!("<p:checkerboard dir=\"{}\"/>", if vert { "vert" } else { "horz" })
+            format!("<p:checker dir=\"{}\"/>", if vert { "vert" } else { "horz" })
         }
         TransitionType::Blinds  => {
             let vert = matches!(props.direction, Some(TransitionDir::Up) | Some(TransitionDir::Down));
@@ -1320,12 +1314,56 @@ pub fn gen_xml_transition(slide: &Slide) -> String {
         TransitionType::Strips  => format!("<p:strips{dir_attr}/>"),
         TransitionType::Plus    => "<p:plus/>".to_string(),
         TransitionType::Split   => {
-            // Split needs orientation: horz/vert and in/out
-            format!("<p:split orient=\"horz\" dir=\"in\"/>")
+            let orient = if matches!(props.direction, Some(TransitionDir::Up) | Some(TransitionDir::Down)) {
+                "vert"
+            } else {
+                "horz"
+            };
+            format!("<p:split orient=\"{orient}\"/>")
         }
+        // p14/p15 transitions use fade as fallback
+        _ => "<p:fade/>".to_string(),
     };
 
-    format!("<p:transition{attrs}>{inner}</p:transition>")
+    if is_p14 || is_p15 {
+        // p14 extended transition element
+        let p14_inner = match &props.transition_type {
+            TransitionType::Flash    => "<p14:flash/>".to_string(),
+            TransitionType::Zoom     => format!("<p14:prism{dir_attr}/>"),
+            TransitionType::Vortex   => format!("<p14:vortex{dir_attr}/>"),
+            TransitionType::Ripple   => "<p14:ripple/>".to_string(),
+            TransitionType::Glitter  => format!("<p14:glitter{dir_attr}/>"),
+            TransitionType::Honeycomb=> "<p14:honeycomb/>".to_string(),
+            TransitionType::Shred    => "<p14:shred/>".to_string(),
+            TransitionType::Switch   => format!("<p14:switch{dir_attr}/>"),
+            TransitionType::Flip     => format!("<p14:flip{dir_attr}/>"),
+            TransitionType::Pan      => format!("<p14:pan{dir_attr}/>"),
+            TransitionType::Ferris   => format!("<p14:ferris{dir_attr}/>"),
+            TransitionType::Gallery  => format!("<p14:gallery{dir_attr}/>"),
+            TransitionType::Conveyor => format!("<p14:conveyor{dir_attr}/>"),
+            TransitionType::Doors    => format!("<p14:doors{dir_attr}/>"),
+            TransitionType::Box      => format!("<p14:window{dir_attr}/>"),
+            TransitionType::Morph    => "<p15:prstTrans prst=\"morph\"/>".to_string(),
+            _ => unreachable!(),
+        };
+        let ns_req = if is_p15 { "p15" } else { "p14" };
+        let p14_ns = "xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\"";
+        let extra_ns = if is_p15 {
+            " xmlns:p15=\"http://schemas.microsoft.com/office/powerpoint/2012/main\""
+        } else { "" };
+        format!(
+            "<mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\">\
+             <mc:Choice Requires=\"{ns_req}\">\
+             <p:transition{attrs} {p14_ns}{extra_ns}>{p14_inner}</p:transition>\
+             </mc:Choice>\
+             <mc:Fallback>\
+             <p:transition{attrs}>{standard_inner}</p:transition>\
+             </mc:Fallback>\
+             </mc:AlternateContent>"
+        )
+    } else {
+        format!("<p:transition{attrs}>{inner}</p:transition>", inner = standard_inner)
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1598,10 +1636,10 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
             let id_fx     = ctn_id; ctn_id += 1;
             let id_fx2    = ctn_id; ctn_id += 1;
 
-            let (preset_id, preset_class, preset_subtype, mut inner_xml) =
-                build_effect_xml(&anim.effect, *spid, id_set, id_fx, id_fx2);
+            let fx = build_effect_xml(&anim.effect, *spid, id_set, id_fx, id_fx2);
 
             // Rewrite target for text sub-range if specified
+            let mut inner_xml = fx.inner;
             if let Some(tt) = &anim.text_target {
                 let bare = format!("<p:spTgt spid=\"{spid}\"/>");
                 let with_tx = match tt {
@@ -1624,6 +1662,11 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
                 TriggerKind::After => "afterEffect",
             };
 
+            let preset_id = fx.preset_id;
+            let preset_class = fx.preset_class;
+            let preset_subtype = fx.preset_subtype;
+            let iterate_xml = fx.iterate.as_deref().unwrap_or("");
+
             // animBg="1" applies when the whole paragraph/shape is built; omit it for
             // character-range / paragraph-range sub-targets (charRg / pRg) because the
             // OOXML spec states animBg must NOT be set when animating selected characters.
@@ -1635,6 +1678,7 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
 <p:cTn id=\"{id_effect}\" presetID=\"{preset_id}\" presetClass=\"{preset_class}\" \
 presetSubtype=\"{preset_subtype}\" fill=\"hold\" grpId=\"{grp_idx}\" nodeType=\"{node_type}\">\
 <p:stCondLst><p:cond delay=\"0\"/></p:stCondLst>\
+{iterate_xml}\
 <p:childTnLst>{inner_xml}</p:childTnLst></p:cTn>\
 </p:par>"
             ));
@@ -1663,7 +1707,143 @@ presetSubtype=\"{preset_subtype}\" fill=\"hold\" grpId=\"{grp_idx}\" nodeType=\"
     s
 }
 
-/// Returns `(presetID, presetClass, presetSubtype, inner_xml)`.
+/// Structured return type for `build_effect_xml`, replacing the old 5-tuple.
+struct EffectXml {
+    preset_id: u32,
+    preset_class: &'static str,
+    preset_subtype: u32,
+    iterate: Option<String>,
+    inner: String,
+}
+
+impl EffectXml {
+    /// Shorthand for a simple effect with no iterate XML.
+    fn new(preset_id: u32, preset_class: &'static str, preset_subtype: u32, inner: String) -> Self {
+        Self { preset_id, preset_class, preset_subtype, iterate: None, inner }
+    }
+}
+
+// ── Shared helpers that collapse entrance/exit mirror pairs ──────────────────
+
+/// Build an entrance or exit effect that uses a SMIL filter (Fade, Wipe, Split, Blinds, etc.).
+fn filter_effect(
+    preset_id: u32, subtype: u32, filter: &str, entering: bool,
+    spid: usize, id_set: usize, id_fx: usize,
+) -> EffectXml {
+    let class = if entering { "entr" } else { "exit" };
+    let dir = if entering { "in" } else { "out" };
+    let inner = if entering {
+        format!("{}{}", set_visibility_xml(spid, id_set, "visible", 0),
+                anim_effect_filter(spid, id_fx, dir, filter, 500))
+    } else {
+        format!("{}{}", anim_effect_filter(spid, id_fx, dir, filter, 500),
+                set_visibility_xml(spid, id_set, "hidden", 500))
+    };
+    EffectXml::new(preset_id, class, subtype, inner)
+}
+
+/// Build an entrance or exit effect based on uniform scale animation.
+fn scale_effect(
+    preset_id: u32, from: u32, to: u32, dur: u32, entering: bool,
+    spid: usize, id_set: usize, id_fx: usize,
+) -> EffectXml {
+    let class = if entering { "entr" } else { "exit" };
+    let inner = if entering {
+        format!("{}{}", set_visibility_xml(spid, id_set, "visible", 0),
+                anim_scale_xml(spid, id_fx, from, to, dur))
+    } else {
+        format!("{}{}", anim_scale_xml(spid, id_fx, from, to, dur),
+                set_visibility_xml(spid, id_set, "hidden", dur))
+    };
+    EffectXml::new(preset_id, class, 0, inner)
+}
+
+/// Build an entrance or exit effect based on asymmetric (x,y) scale animation.
+fn scale_xy_effect(
+    preset_id: u32, subtype: u32,
+    from_x: u32, from_y: u32, to_x: u32, to_y: u32, dur: u32,
+    entering: bool, spid: usize, id_set: usize, id_fx: usize,
+) -> EffectXml {
+    let class = if entering { "entr" } else { "exit" };
+    let inner = if entering {
+        format!("{}{}", set_visibility_xml(spid, id_set, "visible", 0),
+                anim_scale_xy_xml(spid, id_fx, from_x, from_y, to_x, to_y, dur))
+    } else {
+        format!("{}{}", anim_scale_xy_xml(spid, id_fx, from_x, from_y, to_x, to_y, dur),
+                set_visibility_xml(spid, id_set, "hidden", dur))
+    };
+    EffectXml::new(preset_id, class, subtype, inner)
+}
+
+/// Build an entrance or exit effect that combines scale + rotation.
+fn scale_rot_effect(
+    preset_id: u32, scale_from: u32, scale_to: u32, rot_degrees: f32, dur: u32,
+    entering: bool, spid: usize, id_set: usize, id_fx: usize, id_fx2: usize,
+) -> EffectXml {
+    let class = if entering { "entr" } else { "exit" };
+    let rot_by = (rot_degrees * 60_000.0).round() as i64;
+    let anim = format!("{}{}", anim_scale_xml(spid, id_fx, scale_from, scale_to, dur),
+                        anim_rot_xml(spid, id_fx2, rot_by, dur));
+    let inner = if entering {
+        format!("{}{}", set_visibility_xml(spid, id_set, "visible", 0), anim)
+    } else {
+        format!("{}{}", anim, set_visibility_xml(spid, id_set, "hidden", dur))
+    };
+    EffectXml::new(preset_id, class, 0, inner)
+}
+
+/// Build an entrance or exit effect that combines scale + fly (position).
+fn scale_fly_effect(
+    preset_id: u32, scale_from: u32, scale_to: u32,
+    fly_attr: &str, fly_start: f32, fly_end: f32, dur: u32,
+    entering: bool, spid: usize, id_set: usize, id_fx: usize, id_fx2: usize,
+) -> EffectXml {
+    let class = if entering { "entr" } else { "exit" };
+    let anim = format!("{}{}", anim_scale_xml(spid, id_fx, scale_from, scale_to, dur),
+                        anim_fly_xml(spid, id_fx2, fly_attr, fly_start, fly_end, dur));
+    let inner = if entering {
+        format!("{}{}", set_visibility_xml(spid, id_set, "visible", 0), anim)
+    } else {
+        format!("{}{}", anim, set_visibility_xml(spid, id_set, "hidden", dur))
+    };
+    EffectXml::new(preset_id, class, 0, inner)
+}
+
+/// Build an entrance or exit effect based on fly (position) animation only.
+fn fly_effect(
+    preset_id: u32, subtype: u32,
+    attr: &str, start_val: f32, end_val: f32, dur: u32,
+    entering: bool, spid: usize, id_set: usize, id_fx: usize,
+) -> EffectXml {
+    let class = if entering { "entr" } else { "exit" };
+    let inner = if entering {
+        format!("{}{}", set_visibility_xml(spid, id_set, "visible", 0),
+                anim_fly_xml(spid, id_fx, attr, start_val, end_val, dur))
+    } else {
+        format!("{}{}", anim_fly_xml(spid, id_fx, attr, start_val, end_val, dur),
+                set_visibility_xml(spid, id_set, "hidden", dur))
+    };
+    EffectXml::new(preset_id, class, subtype, inner)
+}
+
+/// Build an entrance or exit effect based on rotation animation only.
+fn rot_effect(
+    preset_id: u32, rot_degrees: f32, dur: u32,
+    entering: bool, spid: usize, id_set: usize, id_fx: usize,
+) -> EffectXml {
+    let class = if entering { "entr" } else { "exit" };
+    let rot_by = (rot_degrees * 60_000.0).round() as i64;
+    let inner = if entering {
+        format!("{}{}", set_visibility_xml(spid, id_set, "visible", 0),
+                anim_rot_xml(spid, id_fx, rot_by, dur))
+    } else {
+        format!("{}{}", anim_rot_xml(spid, id_fx, rot_by, dur),
+                set_visibility_xml(spid, id_set, "hidden", dur))
+    };
+    EffectXml::new(preset_id, class, 0, inner)
+}
+
+/// Returns an `EffectXml` describing the animation nodes for the given effect.
 ///
 /// `id_set` is used for the `<p:set>` visibility node (entrance/exit).
 /// `id_fx`  is used for the motion/filter animation node.
@@ -1678,588 +1858,401 @@ fn build_effect_xml(
     id_set: usize,
     id_fx: usize,
     id_fx2: usize,
-) -> (u32, &'static str, u32, String) {
-    /// Prepend a make-visible set to an entrance animation XML string.
-    fn entr(vis_xml: String, fx_xml: String) -> String { format!("{vis_xml}{fx_xml}") }
-    /// Append a delayed make-hidden set to an exit animation XML string.
-    fn exit_xml(fx_xml: String, hide_xml: String) -> String { format!("{fx_xml}{hide_xml}") }
-
+) -> EffectXml {
     match effect {
         // ── Instant visibility toggle — no separate animation node ──────
-        AnimationEffectType::Appear    => (1, "entr", 0, set_visibility_xml(spid, id_set, "visible", 0)),
-        AnimationEffectType::Disappear => (1, "exit", 0, set_visibility_xml(spid, id_set, "hidden",  0)),
+        AnimationEffectType::Appear    => EffectXml::new(1, "entr", 0, set_visibility_xml(spid, id_set, "visible", 0)),
+        AnimationEffectType::Disappear => EffectXml::new(1, "exit", 0, set_visibility_xml(spid, id_set, "hidden",  0)),
 
         // ── Fade ────────────────────────────────────────────────────────
-        AnimationEffectType::FadeIn  => (10, "entr", 0,
-            entr(set_visibility_xml(spid, id_set, "visible", 0),
-                 anim_effect_filter(spid, id_fx, "in",  "fade", 500))),
-        AnimationEffectType::FadeOut => (10, "exit", 0,
-            exit_xml(anim_effect_filter(spid, id_fx, "out", "fade", 500),
-                     set_visibility_xml(spid, id_set, "hidden", 500))),
+        AnimationEffectType::FadeIn   => filter_effect(10, 0, "fade", true,  spid, id_set, id_fx),
+        AnimationEffectType::FadeOut  => filter_effect(10, 0, "fade", false, spid, id_set, id_fx),
 
         // ── Wipe ────────────────────────────────────────────────────────
         AnimationEffectType::WipeIn(dir) => {
             let (subtype, filter) = wipe_filter(dir);
-            (4, "entr", subtype,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_effect_filter(spid, id_fx, "in", &filter, 500)))
+            filter_effect(4, subtype, &filter, true, spid, id_set, id_fx)
         }
         AnimationEffectType::WipeOut(dir) => {
             let (subtype, filter) = wipe_filter(dir);
-            (4, "exit", subtype,
-             exit_xml(anim_effect_filter(spid, id_fx, "out", &filter, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500)))
+            filter_effect(4, subtype, &filter, false, spid, id_set, id_fx)
         }
 
         // ── Split ───────────────────────────────────────────────────────
         AnimationEffectType::SplitIn(orient) => {
             let (subtype, filter) = split_filter(orient, true);
-            (3, "entr", subtype,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_effect_filter(spid, id_fx, "in", &filter, 500)))
+            filter_effect(3, subtype, &filter, true, spid, id_set, id_fx)
         }
         AnimationEffectType::SplitOut(orient) => {
             let (subtype, filter) = split_filter(orient, false);
-            (3, "exit", subtype,
-             exit_xml(anim_effect_filter(spid, id_fx, "out", &filter, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500)))
+            filter_effect(3, subtype, &filter, false, spid, id_set, id_fx)
         }
 
         // ── Zoom ────────────────────────────────────────────────────────
-        AnimationEffectType::ZoomIn  => (11, "entr", 0,
-            entr(set_visibility_xml(spid, id_set, "visible", 0),
-                 anim_scale_xml(spid, id_fx, 10000,  100000, 500))),
-        AnimationEffectType::ZoomOut => (11, "exit", 0,
-            exit_xml(anim_scale_xml(spid, id_fx, 100000, 10000, 500),
-                     set_visibility_xml(spid, id_set, "hidden", 500))),
+        AnimationEffectType::ZoomIn  => scale_effect(11, 10000,  100000, 500, true,  spid, id_set, id_fx),
+        AnimationEffectType::ZoomOut => scale_effect(11, 100000, 10000,  500, false, spid, id_set, id_fx),
 
         // ── Fly ─────────────────────────────────────────────────────────
         AnimationEffectType::FlyIn(dir) => {
             let (subtype, attr, start_val, end_val) = fly_params(dir, true);
-            (2, "entr", subtype,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_fly_xml(spid, id_fx, attr, start_val, end_val, 500)))
+            fly_effect(2, subtype, attr, start_val, end_val, 500, true, spid, id_set, id_fx)
         }
         AnimationEffectType::FlyOut(dir) => {
             let (subtype, attr, start_val, end_val) = fly_params(dir, false);
-            (2, "exit", subtype,
-             exit_xml(anim_fly_xml(spid, id_fx, attr, start_val, end_val, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500)))
+            fly_effect(2, subtype, attr, start_val, end_val, 500, false, spid, id_set, id_fx)
         }
 
         // ── Blinds ──────────────────────────────────────────────────────
         AnimationEffectType::BlindsIn(orient) => {
             let (subtype, filter) = blinds_filter(orient);
-            (3, "entr", subtype,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_effect_filter(spid, id_fx, "in", &filter, 500)))
+            filter_effect(3, subtype, &filter, true, spid, id_set, id_fx)
+        }
+        AnimationEffectType::BlindsOut(orient) => {
+            let (subtype, filter) = blinds_filter(orient);
+            filter_effect(3, subtype, &filter, false, spid, id_set, id_fx)
         }
 
         // ── Checkerboard ────────────────────────────────────────────────
         AnimationEffectType::CheckerboardIn(dir) => {
             let (subtype, filter) = checkerboard_filter(dir);
-            (5, "entr", subtype,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_effect_filter(spid, id_fx, "in", &filter, 500)))
+            filter_effect(5, subtype, &filter, true, spid, id_set, id_fx)
+        }
+        AnimationEffectType::CheckerboardOut(dir) => {
+            let (subtype, filter) = checkerboard_filter(dir);
+            filter_effect(5, subtype, &filter, false, spid, id_set, id_fx)
         }
 
-        // ── Dissolve In ─────────────────────────────────────────────────
-        AnimationEffectType::DissolveIn =>
-            (12, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_effect_filter(spid, id_fx, "in", "dissolve()", 500))),
+        // ── Dissolve ────────────────────────────────────────────────────
+        AnimationEffectType::DissolveIn  => filter_effect(12, 0, "dissolve()", true,  spid, id_set, id_fx),
+        AnimationEffectType::DissolveOut => filter_effect(12, 0, "dissolve()", false, spid, id_set, id_fx),
 
-        // ── Peek In ─────────────────────────────────────────────────────
+        // ── Peek ────────────────────────────────────────────────────────
         AnimationEffectType::PeekIn(dir) => {
             let (subtype, filter) = wipe_filter(dir);
-            (13, "entr", subtype,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_effect_filter(spid, id_fx, "in", &filter, 500)))
+            filter_effect(13, subtype, &filter, true, spid, id_set, id_fx)
+        }
+        AnimationEffectType::PeekOut(dir) => {
+            let (subtype, filter) = wipe_filter(dir);
+            filter_effect(13, subtype, &filter, false, spid, id_set, id_fx)
         }
 
         // ── Random Bars ─────────────────────────────────────────────────
         AnimationEffectType::RandomBarsIn(orient) => {
             let (subtype, filter) = random_bars_filter(orient);
-            (14, "entr", subtype,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_effect_filter(spid, id_fx, "in", &filter, 500)))
+            filter_effect(14, subtype, &filter, true, spid, id_set, id_fx)
+        }
+        AnimationEffectType::RandomBarsOut(orient) => {
+            let (subtype, filter) = random_bars_filter(orient);
+            filter_effect(14, subtype, &filter, false, spid, id_set, id_fx)
         }
 
         // ── Shape (Box / Circle / Diamond / Plus) ───────────────────────
         AnimationEffectType::ShapeIn(variant) => {
-            let (preset_id, filter) = shape_filter(variant, true);
-            (preset_id, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_effect_filter(spid, id_fx, "in", &filter, 500)))
+            let (pid, filter) = shape_filter(variant, true);
+            filter_effect(pid, 0, &filter, true, spid, id_set, id_fx)
+        }
+        AnimationEffectType::ShapeOut(variant) => {
+            let (pid, filter) = shape_filter(variant, false);
+            filter_effect(pid, 0, &filter, false, spid, id_set, id_fx)
         }
 
         // ── Strips ──────────────────────────────────────────────────────
         AnimationEffectType::StripsIn(dir) => {
             let (subtype, filter) = strips_filter(dir);
-            (6, "entr", subtype,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_effect_filter(spid, id_fx, "in", &filter, 500)))
+            filter_effect(6, subtype, &filter, true, spid, id_set, id_fx)
+        }
+        AnimationEffectType::StripsOut(dir) => {
+            let (subtype, filter) = strips_filter(dir);
+            filter_effect(6, subtype, &filter, false, spid, id_set, id_fx)
         }
 
         // ── Wedge ───────────────────────────────────────────────────────
-        AnimationEffectType::WedgeIn =>
-            (17, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_effect_filter(spid, id_fx, "in", "wedge()", 500))),
+        AnimationEffectType::WedgeIn  => filter_effect(17, 0, "wedge()", true,  spid, id_set, id_fx),
+        AnimationEffectType::WedgeOut => filter_effect(17, 0, "wedge()", false, spid, id_set, id_fx),
 
         // ── Wheel ───────────────────────────────────────────────────────
         AnimationEffectType::WheelIn(spokes) => {
             let n = (*spokes).max(1);
             let filter = format!("wheel(spokes={n})");
-            (18, "entr", n,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_effect_filter(spid, id_fx, "in", &filter, 500)))
+            filter_effect(18, n, &filter, true, spid, id_set, id_fx)
+        }
+        AnimationEffectType::WheelOut(spokes) => {
+            let n = (*spokes).max(1);
+            let filter = format!("wheel(spokes={n})");
+            filter_effect(18, n, &filter, false, spid, id_set, id_fx)
         }
 
-        // ── Expand ──────────────────────────────────────────────────────
-        AnimationEffectType::ExpandIn =>
-            (22, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_scale_xml(spid, id_fx, 0, 100000, 500))),
+        // ── Expand / Contract ───────────────────────────────────────────
+        AnimationEffectType::ExpandIn    => scale_effect(22, 0,      100000, 500, true,  spid, id_set, id_fx),
+        AnimationEffectType::ContractOut => scale_effect(22, 100000, 0,      500, false, spid, id_set, id_fx),
 
         // ── Swivel ──────────────────────────────────────────────────────
-        // Approximated as horizontal-axis swivel: width grows from 0 to 100%
-        AnimationEffectType::SwivelIn =>
-            (21, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_scale_xy_xml(spid, id_fx, 0, 100000, 100000, 100000, 500))),
+        AnimationEffectType::SwivelIn  => scale_xy_effect(21, 0, 0, 100000, 100000, 100000, 500, true,  spid, id_set, id_fx),
+        AnimationEffectType::SwivelOut => scale_xy_effect(21, 0, 100000, 100000, 0, 100000, 500, false, spid, id_set, id_fx),
 
         // ── Basic Zoom ──────────────────────────────────────────────────
-        AnimationEffectType::BasicZoomIn =>
-            (27, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_scale_xml(spid, id_fx, 10000, 100000, 500))),
+        AnimationEffectType::BasicZoomIn  => scale_effect(27, 10000,  100000, 500, true,  spid, id_set, id_fx),
+        AnimationEffectType::BasicZoomOut => scale_effect(27, 100000, 10000,  500, false, spid, id_set, id_fx),
 
         // ── Centre Revolve ──────────────────────────────────────────────
-        // Grows from small while revolving — scale + rotation
-        AnimationEffectType::CentreRevolveIn => {
-            let rot_by = (720.0_f32 * 60_000.0).round() as i64; // 2 full rotations
-            (23, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  format!("{}{}", anim_scale_xml(spid, id_fx, 10000, 100000, 700),
-                          anim_rot_xml(spid, id_fx2, rot_by, 700))))
-        }
+        AnimationEffectType::CentreRevolveIn  => scale_rot_effect(23, 10000,  100000, 720.0, 700, true,  spid, id_set, id_fx, id_fx2),
+        AnimationEffectType::CentreRevolveOut => scale_rot_effect(23, 100000, 10000,  720.0, 700, false, spid, id_set, id_fx, id_fx2),
 
-        // ── Float In ────────────────────────────────────────────────────
-        // Fades in while rotating from -90° and moving from upper-right (matches PowerPoint)
+        // ── Float ───────────────────────────────────────────────────────
         AnimationEffectType::FloatIn(_dir) => {
-            (30, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  format!("{}{}", anim_effect_filter(spid, id_fx, "in", "fade", 800),
-                          anim_style_rotation_xml(spid, id_fx2, -90.0, 0.0, 800))))
+            let inner = format!("{}{}{}",
+                set_visibility_xml(spid, id_set, "visible", 0),
+                anim_effect_filter(spid, id_fx, "in", "fade", 800),
+                anim_style_rotation_xml(spid, id_fx2, -90.0, 0.0, 800));
+            EffectXml::new(30, "entr", 0, inner)
+        }
+        AnimationEffectType::FloatOut(_dir) => {
+            let inner = format!("{}{}{}",
+                anim_effect_filter(spid, id_fx, "out", "fade", 800),
+                anim_style_rotation_xml(spid, id_fx2, 0.0, 90.0, 800),
+                set_visibility_xml(spid, id_set, "hidden", 800));
+            EffectXml::new(30, "exit", 0, inner)
         }
 
-        // ── Grow Turn ───────────────────────────────────────────────────
-        // Scales up while rotating 90°
-        AnimationEffectType::GrowTurnIn => {
-            let rot_by = (90.0_f32 * 60_000.0).round() as i64;
-            (24, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  format!("{}{}", anim_scale_xml(spid, id_fx, 10000, 100000, 500),
-                          anim_rot_xml(spid, id_fx2, rot_by, 500))))
-        }
+        // ── Grow Turn / Shrink Turn ─────────────────────────────────────
+        AnimationEffectType::GrowTurnIn    => scale_rot_effect(24, 10000,  100000, 90.0, 500, true,  spid, id_set, id_fx, id_fx2),
+        AnimationEffectType::ShrinkTurnOut => scale_rot_effect(24, 100000, 10000,  90.0, 500, false, spid, id_set, id_fx, id_fx2),
 
-        // ── Rise Up ─────────────────────────────────────────────────────
-        // Rises from below (position animation only)
-        AnimationEffectType::RiseUpIn =>
-            (25, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_fly_xml(spid, id_fx, "ppt_y", 0.5, 0.0, 500))),
+        // ── Rise Up / Sink Down ─────────────────────────────────────────
+        AnimationEffectType::RiseUpIn    => fly_effect(25, 0, "ppt_y", 0.5, 0.0, 500, true,  spid, id_set, id_fx),
+        AnimationEffectType::SinkDownOut => fly_effect(25, 0, "ppt_y", 0.0, 0.5, 500, false, spid, id_set, id_fx),
 
         // ── Spinner ─────────────────────────────────────────────────────
-        // Scales up while spinning a full rotation
-        AnimationEffectType::SpinnerIn => {
-            let rot_by = (360.0_f32 * 60_000.0).round() as i64;
-            (28, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  format!("{}{}", anim_scale_xml(spid, id_fx, 10000, 100000, 700),
-                          anim_rot_xml(spid, id_fx2, rot_by, 700))))
-        }
+        AnimationEffectType::SpinnerIn  => scale_rot_effect(28, 10000,  100000, 360.0, 700, true,  spid, id_set, id_fx, id_fx2),
+        AnimationEffectType::SpinnerOut => scale_rot_effect(28, 100000, 10000,  360.0, 700, false, spid, id_set, id_fx, id_fx2),
 
-        // ── Stretch ─────────────────────────────────────────────────────
-        // Stretches in along one axis
+        // ── Stretch / Stretchy ──────────────────────────────────────────
         AnimationEffectType::StretchIn(dir) => {
             let (from_x, from_y, subtype) = match dir {
                 Direction::Left | Direction::Right => (0, 100000, 4u32),
                 Direction::Up   | Direction::Down  => (100000, 0, 8u32),
             };
-            (29, "entr", subtype,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_scale_xy_xml(spid, id_fx, from_x, from_y, 100000, 100000, 500)))
+            scale_xy_effect(29, subtype, from_x, from_y, 100000, 100000, 500, true, spid, id_set, id_fx)
+        }
+        AnimationEffectType::StretchyOut(dir) => {
+            let (to_x, to_y, subtype) = match dir {
+                Direction::Left | Direction::Right => (0, 100000, 4u32),
+                Direction::Up   | Direction::Down  => (100000, 0, 8u32),
+            };
+            scale_xy_effect(29, subtype, 100000, 100000, to_x, to_y, 500, false, spid, id_set, id_fx)
         }
 
         // ── Boomerang ───────────────────────────────────────────────────
-        // Approximated as fly-in from right with scale
-        AnimationEffectType::BoomerangIn =>
-            (36, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  format!("{}{}", anim_scale_xml(spid, id_fx, 10000, 100000, 700),
-                          anim_fly_xml(spid, id_fx2, "ppt_x", 1.0, 0.0, 700)))),
+        AnimationEffectType::BoomerangIn  => scale_fly_effect(36, 10000,  100000, "ppt_x", 1.0, 0.0, 700, true,  spid, id_set, id_fx, id_fx2),
+        AnimationEffectType::BoomerangOut => scale_fly_effect(36, 100000, 10000,  "ppt_x", 0.0, 1.0, 700, false, spid, id_set, id_fx, id_fx2),
 
         // ── Bounce ──────────────────────────────────────────────────────
-        // Drops from above with sinusoidal bounce keyframes, revealed by wipe(down)
         AnimationEffectType::BounceIn => {
             let bounce_y = anim_keyframes_xml(spid, id_fx2, "ppt_y", &[
                 (0.0, -1.5), (0.365, 0.08), (0.55, -0.04),
                 (0.72, 0.015), (0.85, -0.005), (1.0, 0.0),
             ], 1600);
-            (26, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  format!("{}{}", anim_effect_filter(spid, id_fx, "in", "wipe(down)", 580), bounce_y)))
+            let inner = format!("{}{}{}",
+                set_visibility_xml(spid, id_set, "visible", 0),
+                anim_effect_filter(spid, id_fx, "in", "wipe(down)", 580),
+                bounce_y);
+            EffectXml::new(26, "entr", 0, inner)
+        }
+        AnimationEffectType::BounceOut => {
+            let bounce_y = anim_keyframes_xml(spid, id_fx, "ppt_y", &[
+                (0.0, 0.0), (0.15, -0.015), (0.30, 0.005),
+                (0.45, -0.003), (0.55, 0.0), (1.0, 1.5),
+            ], 1600);
+            let inner = format!("{}{}", bounce_y, set_visibility_xml(spid, id_set, "hidden", 1600));
+            EffectXml::new(26, "exit", 0, inner)
         }
 
         // ── Credits ─────────────────────────────────────────────────────
-        // Scrolls up from below (slow rise)
-        AnimationEffectType::CreditsIn =>
-            (32, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_fly_xml(spid, id_fx, "ppt_y", 1.0, 0.0, 2000))),
+        AnimationEffectType::CreditsIn  => fly_effect(32, 0, "ppt_y", 1.0,  0.0,  2000, true,  spid, id_set, id_fx),
+        AnimationEffectType::CreditsOut => fly_effect(32, 0, "ppt_y", 0.0, -1.0, 2000, false, spid, id_set, id_fx),
 
-        // ── Curve Up ────────────────────────────────────────────────────
-        // Scales down from oversized while following a bezier arc into position, with fade
+        // ── Curve Up / Curve Down ───────────────────────────────────────
         AnimationEffectType::CurveUpIn => {
             let id_fx3 = id_fx2 + 1;
             let path = "M -0.46736 0.92887 C -0.37517 0.88508 -0.02552 0.75279 \
                         0.0908 0.66613 C 0.20747 0.57948 0.21649 0.50394 \
                         0.23177 0.40825 C 0.24705 0.31256 0.22118 0.15964 \
                         0.18264 0.09152 C 0.1441 0.02341 0.03802 0.0 0.0 0.0";
-            (52, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  format!("{}{}{}",
-                      anim_scale_decel_xy_xml(spid, id_fx, 250000, 250000, 100000, 100000, 1000, 50000),
-                      anim_motion_xml(spid, id_fx2, path, 1000, 50000),
-                      anim_effect_filter(spid, id_fx3, "in", "fade", 1000))))
+            let inner = format!("{}{}{}{}",
+                set_visibility_xml(spid, id_set, "visible", 0),
+                anim_scale_decel_xy_xml(spid, id_fx, 250000, 250000, 100000, 100000, 1000, 50000),
+                anim_motion_xml(spid, id_fx2, path, 1000, 50000),
+                anim_effect_filter(spid, id_fx3, "in", "fade", 1000));
+            EffectXml::new(52, "entr", 0, inner)
         }
-
-        // ── Drop ────────────────────────────────────────────────────────
-        // Falls in from above
-        AnimationEffectType::DropIn =>
-            (34, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_fly_xml(spid, id_fx, "ppt_y", -1.0, 0.0, 500))),
-
-        // ── Flip ────────────────────────────────────────────────────────
-        // Approximated as horizontal swivel (width grows from 0)
-        AnimationEffectType::FlipIn =>
-            (35, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_scale_xy_xml(spid, id_fx, 0, 100000, 100000, 100000, 500))),
-
-        // ── Pinwheel ────────────────────────────────────────────────────
-        // Fast spin + scale (like Spinner but faster rotation)
-        AnimationEffectType::PinwheelIn => {
-            let rot_by = (720.0_f32 * 60_000.0).round() as i64; // 2 full spins
-            (37, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  format!("{}{}", anim_scale_xml(spid, id_fx, 10000, 100000, 600),
-                          anim_rot_xml(spid, id_fx2, rot_by, 600))))
-        }
-
-        // ── Spiral In ───────────────────────────────────────────────────
-        // Approximated as scale + fly from off-screen diagonal
-        AnimationEffectType::SpiralIn =>
-            (38, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  format!("{}{}", anim_scale_xml(spid, id_fx, 10000, 100000, 700),
-                          anim_fly_xml(spid, id_fx2, "ppt_x", -0.5, 0.0, 700)))),
-
-        // ── Basic Swivel ────────────────────────────────────────────────
-        // Quarter rotation entrance
-        AnimationEffectType::BasicSwivelIn => {
-            let rot_by = (90.0_f32 * 60_000.0).round() as i64;
-            (39, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  anim_rot_xml(spid, id_fx, rot_by, 500)))
-        }
-
-        // ── Whip ────────────────────────────────────────────────────────
-        // Fast fly-in from right with scale
-        AnimationEffectType::WhipIn =>
-            (40, "entr", 0,
-             entr(set_visibility_xml(spid, id_set, "visible", 0),
-                  format!("{}{}", anim_scale_xml(spid, id_fx, 10000, 100000, 400),
-                          anim_fly_xml(spid, id_fx2, "ppt_x", 1.0, 0.0, 400)))),
-
-        // ── Exit Basic (filter-based mirrors of entrance counterparts) ──
-        AnimationEffectType::BlindsOut(orient) => {
-            let (subtype, filter) = blinds_filter(orient);
-            (3, "exit", subtype,
-             exit_xml(anim_effect_filter(spid, id_fx, "out", &filter, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500)))
-        }
-        AnimationEffectType::CheckerboardOut(dir) => {
-            let (subtype, filter) = checkerboard_filter(dir);
-            (5, "exit", subtype,
-             exit_xml(anim_effect_filter(spid, id_fx, "out", &filter, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500)))
-        }
-        AnimationEffectType::DissolveOut =>
-            (12, "exit", 0,
-             exit_xml(anim_effect_filter(spid, id_fx, "out", "dissolve()", 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500))),
-        AnimationEffectType::PeekOut(dir) => {
-            let (subtype, filter) = wipe_filter(dir);
-            (13, "exit", subtype,
-             exit_xml(anim_effect_filter(spid, id_fx, "out", &filter, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500)))
-        }
-        AnimationEffectType::RandomBarsOut(orient) => {
-            let (subtype, filter) = random_bars_filter(orient);
-            (14, "exit", subtype,
-             exit_xml(anim_effect_filter(spid, id_fx, "out", &filter, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500)))
-        }
-        AnimationEffectType::ShapeOut(variant) => {
-            let (preset_id, filter) = shape_filter(variant, false);
-            (preset_id, "exit", 0,
-             exit_xml(anim_effect_filter(spid, id_fx, "out", &filter, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500)))
-        }
-        AnimationEffectType::StripsOut(dir) => {
-            let (subtype, filter) = strips_filter(dir);
-            (6, "exit", subtype,
-             exit_xml(anim_effect_filter(spid, id_fx, "out", &filter, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500)))
-        }
-        AnimationEffectType::WedgeOut =>
-            (17, "exit", 0,
-             exit_xml(anim_effect_filter(spid, id_fx, "out", "wedge()", 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500))),
-        AnimationEffectType::WheelOut(spokes) => {
-            let n = (*spokes).max(1);
-            let filter = format!("wheel(spokes={n})");
-            (18, "exit", n,
-             exit_xml(anim_effect_filter(spid, id_fx, "out", &filter, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500)))
-        }
-
-        // ── Exit Subtle ─────────────────────────────────────────────────
-        AnimationEffectType::ContractOut =>
-            (22, "exit", 0,
-             exit_xml(anim_scale_xml(spid, id_fx, 100000, 0, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500))),
-        AnimationEffectType::SwivelOut =>
-            (21, "exit", 0,
-             exit_xml(anim_scale_xy_xml(spid, id_fx, 100000, 100000, 0, 100000, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500))),
-
-        // ── Exit Moderate ───────────────────────────────────────────────
-        AnimationEffectType::CentreRevolveOut => {
-            let rot_by = (720.0_f32 * 60_000.0).round() as i64;
-            (23, "exit", 0,
-             exit_xml(
-                 format!("{}{}", anim_scale_xml(spid, id_fx, 100000, 10000, 700),
-                         anim_rot_xml(spid, id_fx2, rot_by, 700)),
-                 set_visibility_xml(spid, id_set, "hidden", 700)))
-        }
-        AnimationEffectType::CollapseOut =>
-            (31, "exit", 0,
-             exit_xml(anim_scale_xy_xml(spid, id_fx, 100000, 100000, 100000, 0, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500))),
-        AnimationEffectType::FloatOut(_dir) =>
-            (30, "exit", 0,
-             exit_xml(
-                 format!("{}{}", anim_effect_filter(spid, id_fx, "out", "fade", 800),
-                         anim_style_rotation_xml(spid, id_fx2, 0.0, 90.0, 800)),
-                 set_visibility_xml(spid, id_set, "hidden", 800))),
-        AnimationEffectType::ShrinkTurnOut => {
-            let rot_by = (90.0_f32 * 60_000.0).round() as i64;
-            (24, "exit", 0,
-             exit_xml(
-                 format!("{}{}", anim_scale_xml(spid, id_fx, 100000, 10000, 500),
-                         anim_rot_xml(spid, id_fx2, rot_by, 500)),
-                 set_visibility_xml(spid, id_set, "hidden", 500)))
-        }
-        AnimationEffectType::SinkDownOut =>
-            (25, "exit", 0,
-             exit_xml(anim_fly_xml(spid, id_fx, "ppt_y", 0.0, 0.5, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500))),
-        AnimationEffectType::SpinnerOut => {
-            let rot_by = (360.0_f32 * 60_000.0).round() as i64;
-            (28, "exit", 0,
-             exit_xml(
-                 format!("{}{}", anim_scale_xml(spid, id_fx, 100000, 10000, 700),
-                         anim_rot_xml(spid, id_fx2, rot_by, 700)),
-                 set_visibility_xml(spid, id_set, "hidden", 700)))
-        }
-        AnimationEffectType::BasicZoomOut =>
-            (27, "exit", 0,
-             exit_xml(anim_scale_xml(spid, id_fx, 100000, 10000, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500))),
-        AnimationEffectType::StretchyOut(dir) => {
-            let (to_x, to_y, subtype) = match dir {
-                Direction::Left | Direction::Right => (0, 100000, 4u32),
-                Direction::Up   | Direction::Down  => (100000, 0, 8u32),
-            };
-            (29, "exit", subtype,
-             exit_xml(anim_scale_xy_xml(spid, id_fx, 100000, 100000, to_x, to_y, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500)))
-        }
-
-        // ── Exit Exciting ───────────────────────────────────────────────
-        AnimationEffectType::BoomerangOut =>
-            (36, "exit", 0,
-             exit_xml(
-                 format!("{}{}", anim_scale_xml(spid, id_fx, 100000, 10000, 700),
-                         anim_fly_xml(spid, id_fx2, "ppt_x", 0.0, 1.0, 700)),
-                 set_visibility_xml(spid, id_set, "hidden", 700))),
-        AnimationEffectType::BounceOut => {
-            // Brief bounce up, then fall off the bottom of the slide
-            let bounce_y = anim_keyframes_xml(spid, id_fx, "ppt_y", &[
-                (0.0, 0.0), (0.15, -0.015), (0.30, 0.005),
-                (0.45, -0.003), (0.55, 0.0), (1.0, 1.5),
-            ], 1600);
-            (26, "exit", 0,
-             exit_xml(bounce_y, set_visibility_xml(spid, id_set, "hidden", 1600)))
-        }
-        AnimationEffectType::CreditsOut =>
-            (32, "exit", 0,
-             exit_xml(anim_fly_xml(spid, id_fx, "ppt_y", 0.0, -1.0, 2000),
-                      set_visibility_xml(spid, id_set, "hidden", 2000))),
         AnimationEffectType::CurveDownOut => {
-            // Scale up while following a downward bezier arc, with fade out
             let id_fx3 = id_fx2 + 1;
             let path = "M 0.0 0.0 C 0.03802 0.0 0.1441 0.02341 0.18264 0.09152 \
                         C 0.22118 0.15964 0.24705 0.31256 0.23177 0.40825 \
                         C 0.21649 0.50394 0.20747 0.57948 0.0908 0.66613 \
                         C -0.02552 0.75279 -0.37517 0.88508 -0.46736 0.92887";
-            (52, "exit", 0,
-             exit_xml(
-                 format!("{}{}{}",
-                     anim_scale_decel_xy_xml(spid, id_fx, 100000, 100000, 250000, 250000, 1000, 50000),
-                     anim_motion_xml(spid, id_fx2, path, 1000, 50000),
-                     anim_effect_filter(spid, id_fx3, "out", "fade", 1000)),
-                 set_visibility_xml(spid, id_set, "hidden", 1000)))
+            let inner = format!("{}{}{}{}",
+                anim_scale_decel_xy_xml(spid, id_fx, 100000, 100000, 250000, 250000, 1000, 50000),
+                anim_motion_xml(spid, id_fx2, path, 1000, 50000),
+                anim_effect_filter(spid, id_fx3, "out", "fade", 1000),
+                set_visibility_xml(spid, id_set, "hidden", 1000));
+            EffectXml::new(52, "exit", 0, inner)
         }
-        AnimationEffectType::DropOut =>
-            (34, "exit", 0,
-             exit_xml(anim_fly_xml(spid, id_fx, "ppt_y", 0.0, 1.0, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500))),
-        AnimationEffectType::FlipOut =>
-            (35, "exit", 0,
-             exit_xml(anim_scale_xy_xml(spid, id_fx, 100000, 100000, 0, 100000, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500))),
-        AnimationEffectType::PinwheelOut => {
-            let rot_by = (720.0_f32 * 60_000.0).round() as i64;
-            (37, "exit", 0,
-             exit_xml(
-                 format!("{}{}", anim_scale_xml(spid, id_fx, 100000, 10000, 600),
-                         anim_rot_xml(spid, id_fx2, rot_by, 600)),
-                 set_visibility_xml(spid, id_set, "hidden", 600)))
-        }
-        AnimationEffectType::SpiralOut =>
-            (38, "exit", 0,
-             exit_xml(
-                 format!("{}{}", anim_scale_xml(spid, id_fx, 100000, 10000, 700),
-                         anim_fly_xml(spid, id_fx2, "ppt_x", 0.0, 0.5, 700)),
-                 set_visibility_xml(spid, id_set, "hidden", 700))),
-        AnimationEffectType::BasicSwivelOut => {
-            let rot_by = (90.0_f32 * 60_000.0).round() as i64;
-            (39, "exit", 0,
-             exit_xml(anim_rot_xml(spid, id_fx, rot_by, 500),
-                      set_visibility_xml(spid, id_set, "hidden", 500)))
-        }
-        AnimationEffectType::WhipOut =>
-            (40, "exit", 0,
-             exit_xml(
-                 format!("{}{}", anim_scale_xml(spid, id_fx, 100000, 10000, 400),
-                         anim_fly_xml(spid, id_fx2, "ppt_x", 0.0, 1.0, 400)),
-                 set_visibility_xml(spid, id_set, "hidden", 400))),
+
+        // ── Drop / Drop Out ─────────────────────────────────────────────
+        AnimationEffectType::DropIn  => fly_effect(34, 0, "ppt_y", -1.0, 0.0, 500, true,  spid, id_set, id_fx),
+        AnimationEffectType::DropOut => fly_effect(34, 0, "ppt_y",  0.0, 1.0, 500, false, spid, id_set, id_fx),
+
+        // ── Flip ────────────────────────────────────────────────────────
+        AnimationEffectType::FlipIn  => scale_xy_effect(35, 0, 0, 100000, 100000, 100000, 500, true,  spid, id_set, id_fx),
+        AnimationEffectType::FlipOut => scale_xy_effect(35, 0, 100000, 100000, 0, 100000, 500, false, spid, id_set, id_fx),
+
+        // ── Collapse Out ────────────────────────────────────────────────
+        AnimationEffectType::CollapseOut =>
+            scale_xy_effect(31, 0, 100000, 100000, 100000, 0, 500, false, spid, id_set, id_fx),
+
+        // ── Pinwheel ────────────────────────────────────────────────────
+        AnimationEffectType::PinwheelIn  => scale_rot_effect(37, 10000,  100000, 720.0, 600, true,  spid, id_set, id_fx, id_fx2),
+        AnimationEffectType::PinwheelOut => scale_rot_effect(37, 100000, 10000,  720.0, 600, false, spid, id_set, id_fx, id_fx2),
+
+        // ── Spiral ──────────────────────────────────────────────────────
+        AnimationEffectType::SpiralIn  => scale_fly_effect(38, 10000,  100000, "ppt_x", -0.5, 0.0, 700, true,  spid, id_set, id_fx, id_fx2),
+        AnimationEffectType::SpiralOut => scale_fly_effect(38, 100000, 10000,  "ppt_x",  0.0, 0.5, 700, false, spid, id_set, id_fx, id_fx2),
+
+        // ── Basic Swivel ────────────────────────────────────────────────
+        AnimationEffectType::BasicSwivelIn  => rot_effect(39, 90.0, 500, true,  spid, id_set, id_fx),
+        AnimationEffectType::BasicSwivelOut => rot_effect(39, 90.0, 500, false, spid, id_set, id_fx),
+
+        // ── Whip ────────────────────────────────────────────────────────
+        AnimationEffectType::WhipIn  => scale_fly_effect(40, 10000,  100000, "ppt_x", 1.0, 0.0, 400, true,  spid, id_set, id_fx, id_fx2),
+        AnimationEffectType::WhipOut => scale_fly_effect(40, 100000, 10000,  "ppt_x", 0.0, 1.0, 400, false, spid, id_set, id_fx, id_fx2),
 
         // ── Emphasis (Basic) ────────────────────────────────────────────
         AnimationEffectType::Spin(degrees) => {
             let by = (*degrees * 60_000.0).round() as i64;
-            (8, "emph", 0, anim_rot_xml(spid, id_fx, by, 2000))
+            EffectXml::new(8, "emph", 0, anim_rot_xml(spid, id_fx, by, 2000))
         }
         AnimationEffectType::Pulse =>
-            (14, "emph", 0, anim_pulse_xml(spid, id_fx, 500)),
+            EffectXml::new(14, "emph", 0, anim_pulse_xml(spid, id_fx, 500)),
         AnimationEffectType::GrowShrink(scale) => {
             let to_val = (*scale * 100_000.0).round() as u32;
-            (18, "emph", 0, anim_scale_xml(spid, id_fx, 100000, to_val, 500))
+            EffectXml::new(18, "emph", 0, anim_scale_xml(spid, id_fx, 100000, to_val, 500))
         }
         AnimationEffectType::FillColor(hex) =>
-            (1, "emph", 0, anim_clr_to_xml(spid, id_fx, "fillcolor", hex, 500, false)),
+            EffectXml::new(1, "emph", 0, anim_clr_to_xml(spid, id_fx, "fillcolor", hex, 500, false)),
         AnimationEffectType::FontColor(hex) =>
-            (2, "emph", 0, anim_clr_to_xml(spid, id_fx, "style.color", hex, 500, false)),
+            EffectXml::new(2, "emph", 0, anim_clr_to_xml(spid, id_fx, "style.color", hex, 500, false)),
         AnimationEffectType::LineColor(hex) =>
-            (3, "emph", 0, anim_clr_to_xml(spid, id_fx, "strokecolor", hex, 500, false)),
+            // presetID=7, subtype=2: animClr targeting stroke.color + set stroke.on=true
+            EffectXml::new(7, "emph", 2, format!("{}{}",
+                anim_clr_to_xml(spid, id_fx, "stroke.color", hex, 2000, false),
+                format!("<p:set><p:cBhvr>\
+                         <p:cTn id=\"{id_fx2}\" dur=\"2000\" fill=\"hold\"/>\
+                         <p:tgtEl><p:spTgt spid=\"{spid}\"/></p:tgtEl>\
+                         <p:attrNameLst><p:attrName>stroke.on</p:attrName></p:attrNameLst>\
+                         </p:cBhvr><p:to><p:strVal val=\"true\"/></p:to></p:set>"))),
         AnimationEffectType::Transparency(level) => {
             let val = level.clamp(0.0, 1.0);
-            (4, "emph", 0, anim_opacity_xml(spid, id_fx, val, 500, true))
+            EffectXml::new(4, "emph", 0, anim_opacity_xml(spid, id_fx, val, 500, true))
         }
 
         // ── Emphasis (Subtle) ────────────────────────────────────────────
         AnimationEffectType::BoldFlash =>
-            (5, "emph", 0,
-             anim_str_discrete_xml(spid, id_fx, "style.fontWeight", "normal", "bold", 500, true)),
+            // presetID=10: discrete fontWeight toggle with 4-keyframe tavLst
+            EffectXml::new(10, "emph", 0, format!("\
+<p:anim calcmode=\"discrete\" valueType=\"str\">\
+<p:cBhvr override=\"childStyle\">\
+<p:cTn id=\"{id_fx}\" dur=\"2000\" fill=\"hold\"/>\
+<p:tgtEl><p:spTgt spid=\"{spid}\"/></p:tgtEl>\
+<p:attrNameLst><p:attrName>style.fontWeight</p:attrName></p:attrNameLst>\
+</p:cBhvr>\
+<p:tavLst>\
+<p:tav tm=\"0\"><p:val><p:strVal val=\"normal\"/></p:val></p:tav>\
+<p:tav tm=\"50000\"><p:val><p:strVal val=\"bold\"/></p:val></p:tav>\
+<p:tav tm=\"60000\"><p:val><p:strVal val=\"normal\"/></p:val></p:tav>\
+<p:tav tm=\"100000\"><p:val><p:strVal val=\"normal\"/></p:val></p:tav>\
+</p:tavLst></p:anim>")),
         AnimationEffectType::BrushColor(hex) =>
-            (6, "emph", 0, anim_clr_to_xml(spid, id_fx, "fillcolor", hex, 500, true)),
+            EffectXml::new(6, "emph", 0, anim_clr_to_xml(spid, id_fx, "fillcolor", hex, 500, true)),
         AnimationEffectType::ComplementaryColor =>
             // Shift fill hue by 180° (10 800 000 = 180° in 1/60000° units)
-            (7, "emph", 0,
+            EffectXml::new(7, "emph", 0,
              anim_clr_hsl_by_xml(spid, id_fx, "fillcolor", 10_800_000, 0, 0, 500, true)),
         AnimationEffectType::ComplementaryColor2 =>
             // Shift fill hue by 120° (7 200 000 = 120° in 1/60000° units)
-            (9, "emph", 0,
+            EffectXml::new(9, "emph", 0,
              anim_clr_hsl_by_xml(spid, id_fx, "fillcolor", 7_200_000, 0, 0, 500, true)),
         AnimationEffectType::ContrastingColor =>
             // Shift luminance by 50 % (moves toward opposite brightness)
-            (10, "emph", 0,
+            EffectXml::new(10, "emph", 0,
              anim_clr_hsl_by_xml(spid, id_fx, "fillcolor", 0, 0, 50_000, 500, true)),
         AnimationEffectType::Darken =>
             // Reduce opacity to 55 % — simulates fill darkening and reverses
-            (11, "emph", 0, anim_opacity_xml(spid, id_fx, 0.55, 500, true)),
+            EffectXml::new(11, "emph", 0, anim_opacity_xml(spid, id_fx, 0.55, 500, true)),
         AnimationEffectType::Desaturate =>
             // Flash fill toward neutral grey ("808080") and revert
-            (12, "emph", 0, anim_clr_to_xml(spid, id_fx, "fillcolor", "808080", 500, true)),
+            EffectXml::new(12, "emph", 0, anim_clr_to_xml(spid, id_fx, "fillcolor", "808080", 500, true)),
         AnimationEffectType::Lighten =>
             // Flash fill toward near-white ("E8E8E8") and revert
-            (13, "emph", 0, anim_clr_to_xml(spid, id_fx, "fillcolor", "E8E8E8", 500, true)),
+            EffectXml::new(13, "emph", 0, anim_clr_to_xml(spid, id_fx, "fillcolor", "E8E8E8", 500, true)),
         AnimationEffectType::ObjectColor(hex) =>
-            (15, "emph", 0, anim_clr_to_xml(spid, id_fx, "fillcolor", hex, 500, true)),
+            EffectXml::new(15, "emph", 0, anim_clr_to_xml(spid, id_fx, "fillcolor", hex, 500, true)),
         AnimationEffectType::Underline =>
-            (16, "emph", 0,
+            EffectXml::new(16, "emph", 0,
              anim_str_discrete_xml(spid, id_fx, "style.textDecoration", "none", "underline", 500, true)),
 
         // ── Emphasis (Moderate) ──────────────────────────────────────────
         AnimationEffectType::ColorPulse(hex) =>
-            (17, "emph", 0, anim_clr_to_xml(spid, id_fx, "fillcolor", hex, 500, true)),
+            EffectXml::new(17, "emph", 0, anim_clr_to_xml(spid, id_fx, "fillcolor", hex, 500, true)),
         AnimationEffectType::GrowWithColor(hex) => {
             // Grow to 115 % (hold) + change fill colour (hold)
-            (19, "emph", 0,
+            EffectXml::new(19, "emph", 0,
              format!("{}{}",
                  anim_scale_xml(spid, id_fx, 100000, 115000, 500),
                  anim_clr_to_xml(spid, id_fx2, "fillcolor", hex, 500, false)))
         }
         AnimationEffectType::Shimmer =>
-            // 3 rapid opacity cycles (250 ms each, auto-reverse each)
-            (20, "emph", 0, format!("\
-<p:anim calcmode=\"lin\" valueType=\"num\">\
+            // presetID=36: letter-by-letter scale+shift+rotate shimmer (text effect)
+            EffectXml {
+                preset_id: 36,
+                preset_class: "emph",
+                preset_subtype: 0,
+                // iterate: letter-by-letter, 10% timing overlap
+                iterate: Some("<p:iterate type=\"lt\"><p:tmPct val=\"10000\"/></p:iterate>".to_string()),
+                inner: format!("\
+<p:animScale>\
 <p:cBhvr>\
-<p:cTn id=\"{id_fx}\" dur=\"250\" repeatCount=\"3\" autoRev=\"1\">\
+<p:cTn id=\"{id_fx}\" dur=\"250\" autoRev=\"1\" fill=\"hold\">\
 <p:stCondLst><p:cond delay=\"0\"/></p:stCondLst></p:cTn>\
 <p:tgtEl><p:spTgt spid=\"{spid}\"/></p:tgtEl>\
-<p:attrNameLst><p:attrName>style.opacity</p:attrName></p:attrNameLst>\
 </p:cBhvr>\
-<p:tavLst>\
-<p:tav tm=\"0\"><p:val><p:fltVal val=\"1\"/></p:val></p:tav>\
-<p:tav tm=\"100000\"><p:val><p:fltVal val=\"0.25\"/></p:val></p:tav>\
-</p:tavLst></p:anim>")),
+<p:to x=\"80000\" y=\"100000\"/>\
+</p:animScale>\
+<p:anim by=\"(#ppt_w*0.10)\" calcmode=\"lin\" valueType=\"num\">\
+<p:cBhvr>\
+<p:cTn id=\"{id_fx2}\" dur=\"250\" autoRev=\"1\" fill=\"hold\">\
+<p:stCondLst><p:cond delay=\"0\"/></p:stCondLst></p:cTn>\
+<p:tgtEl><p:spTgt spid=\"{spid}\"/></p:tgtEl>\
+<p:attrNameLst><p:attrName>ppt_x</p:attrName></p:attrNameLst>\
+</p:cBhvr></p:anim>\
+<p:animRot by=\"-480000\">\
+<p:cBhvr>\
+<p:cTn id=\"{}\" dur=\"250\" autoRev=\"1\" fill=\"hold\">\
+<p:stCondLst><p:cond delay=\"0\"/></p:stCondLst></p:cTn>\
+<p:tgtEl><p:spTgt spid=\"{spid}\"/></p:tgtEl>\
+<p:attrNameLst><p:attrName>r</p:attrName></p:attrNameLst>\
+</p:cBhvr></p:animRot>", id_fx2 + 1),
+            },
         AnimationEffectType::Teeter =>
             // Rock ±4° with 4 swings, returning to 0°
-            (21, "emph", 0, anim_keyframes_xml(spid, id_fx, "style.rotation", &[
+            EffectXml::new(21, "emph", 0, anim_keyframes_xml(spid, id_fx, "style.rotation", &[
                 (0.0, 0.0), (0.2, 4.0), (0.4, -4.0), (0.6, 4.0), (0.8, -4.0), (1.0, 0.0),
             ], 700)),
 
         // ── Emphasis (Exciting) ──────────────────────────────────────────
         AnimationEffectType::Blink =>
             // 3 blink cycles: alternating visible/hidden keyframes
-            (22, "emph", 0, format!("\
+            EffectXml::new(22, "emph", 0, format!("\
 <p:anim calcmode=\"discrete\" valueType=\"str\">\
 <p:cBhvr>\
 <p:cTn id=\"{id_fx}\" dur=\"750\">\
@@ -2276,15 +2269,25 @@ fn build_effect_xml(
 <p:tav tm=\"83333\"><p:val><p:strVal val=\"hidden\"/></p:val></p:tav>\
 <p:tav tm=\"100000\"><p:val><p:strVal val=\"visible\"/></p:val></p:tav>\
 </p:tavLst></p:anim>")),
-        AnimationEffectType::BoldReveal => {
-            // Bold flash + brief scale-up
-            let bold  = anim_str_discrete_xml(spid, id_fx,  "style.fontWeight", "normal", "bold", 500, true);
-            let scale = anim_scale_xml(spid, id_fx2, 100000, 112000, 250);
-            (23, "emph", 0, format!("{bold}{scale}"))
-        }
+        AnimationEffectType::BoldReveal =>
+            // presetID=15: letter-by-letter bold reveal (text effect)
+            EffectXml {
+                preset_id: 15,
+                preset_class: "emph",
+                preset_subtype: 0,
+                // iterate: letter-by-letter, 25ms absolute timing
+                iterate: Some("<p:iterate type=\"lt\"><p:tmAbs val=\"25\"/></p:iterate>".to_string()),
+                inner: format!("<p:set>\
+<p:cBhvr override=\"childStyle\">\
+<p:cTn id=\"{id_fx}\" dur=\"indefinite\"/>\
+<p:tgtEl><p:spTgt spid=\"{spid}\"/></p:tgtEl>\
+<p:attrNameLst><p:attrName>style.fontWeight</p:attrName></p:attrNameLst>\
+</p:cBhvr>\
+<p:to><p:strVal val=\"bold\"/></p:to></p:set>"),
+            },
         AnimationEffectType::Wave =>
             // Oscillating rotation: 5 swings with decreasing amplitude
-            (24, "emph", 0, anim_keyframes_xml(spid, id_fx, "style.rotation", &[
+            EffectXml::new(24, "emph", 0, anim_keyframes_xml(spid, id_fx, "style.rotation", &[
                 (0.0, 0.0),  (0.1, -5.0), (0.2, 5.0),  (0.3, -5.0), (0.4, 5.0),
                 (0.5, -3.0), (0.6, 3.0),  (0.7, -2.0), (0.8, 2.0),  (1.0, 0.0),
             ], 1000)),

@@ -12,11 +12,11 @@ fn main() {
     slide.add_text(
         "Hello, World!",
         TextOptionsBuilder::new()
-            .pos(1.0, 2.0).size(8.0, 2.0)
+            .bounds(1.0, 2.0, 8.0, 2.0)
             .font_size(44.0)
             .bold()
             .align(AlignH::Center)
-            .color("4472C4")
+            .color("#4472C4")
             .build(),
     );
 

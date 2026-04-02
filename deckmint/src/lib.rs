@@ -27,7 +27,7 @@ slide.add_shape(
     ShapeType::Rect,
     ShapeOptionsBuilder::new()
         .x(1.0).y(3.0).w(4.0).h(2.0)
-        .fill_color("4472C4")
+        .fill_color("#4472C4")
         .build()
 );
 
@@ -89,7 +89,7 @@ let slide = pres.add_slide();
 slide.add_image_from(
     ImageOptionsBuilder::new()
         .bytes(png_bytes, "png")
-        .pos(3.0, 2.0).size(4.0, 3.0)
+        .bounds(3.0, 2.0, 4.0, 3.0)
 ).unwrap();
 ```
 
@@ -122,13 +122,13 @@ let slide = pres.add_slide();
 // Standalone equation
 slide.add_equation(
     r"x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}",
-    TextOptionsBuilder::new().pos(1.0, 1.5).size(8.0, 1.0).build(),
+    TextOptionsBuilder::new().bounds(1.0, 1.5, 8.0, 1.0).build(),
 ).unwrap();
 
 // Inline math mixed with text (delimited by $...$)
 slide.add_text_with_math(
     r"The area of a circle is $A = \pi r^2$.",
-    TextOptionsBuilder::new().pos(1.0, 3.0).size(8.0, 1.0).font_size(18.0).build(),
+    TextOptionsBuilder::new().bounds(1.0, 3.0, 8.0, 1.0).font_size(18.0).build(),
 ).unwrap();
 ```
 

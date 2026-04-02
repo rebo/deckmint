@@ -42,14 +42,14 @@
         const s1 = pres.add_slide();
         pres.add_text(s1, 'deckmint', JSON.stringify({
           x: 0.5, y: 0.5, w: 9.0, h: 1.5,
-          fontSize: 48, bold: true, align: 'center', color: '4472C4'
+          fontSize: 48, bold: true, align: 'center', color: '#4472C4'
         }));
         pres.add_text(s1, 'Rust → WASM → PowerPoint', JSON.stringify({
           x: 0.5, y: 2.5, w: 9.0, h: 1.0,
           fontSize: 24, align: 'center'
         }));
         pres.add_shape(s1, 'rect', JSON.stringify({
-          x: 0.5, y: 4.0, w: 9.0, h: 0.1, fill: '4472C4'
+          x: 0.5, y: 4.0, w: 9.0, h: 0.1, fill: '#4472C4'
         }));
 
         // Slide 2: table
@@ -68,10 +68,10 @@
 
         // Slide 3: dark background
         const s3 = pres.add_slide();
-        pres.set_background_color(s3, '1F3864');
+        pres.set_background_color(s3, '#1F3864');
         pres.add_text(s3, 'Generated with Rust ⚙️', JSON.stringify({
           x: 0.5, y: 2.0, w: 9.0, h: 1.5,
-          fontSize: 36, bold: true, align: 'center', color: 'FFFFFF'
+          fontSize: 36, bold: true, align: 'center', color: '#FFFFFF'
         }));
 
         const bytes = pres.write();

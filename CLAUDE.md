@@ -86,6 +86,11 @@ These have already been fixed and are checked by the linter:
 | `<p:push dir="l"/>` (and other directional transitions) | Omit `dir` attribute when it equals `"l"` (left is the OOXML default direction) | `check_transition_xml` |
 | `<a:prstGeom prst="elbow">` / `prst="curve"` in connectors | Use `"bentConnector3"` / `"curvedConnector3"` (correct OOXML preset names) | `check_transition_xml` |
 | `<a:hlinkClick action="ppaction://hlinkshowjump?...">` missing `r:id` | Add `r:id=""` — CT_Hyperlink requires the attribute even with no relationship | `check_nav_hyperlink_rid` |
+| Slide rIds in `presentation.xml` don't match `presentation.xml.rels` | Use index-based rIds (`rId2` = slide 1, `rId3` = slide 2) instead of stored `slide.r_id` — stale values after `promote_slide_to_master` cause mismatch | `check_presentation_slide_rids` |
+| `<p:checkerboard>` in transition XML | Use `<p:checker>` — `p:checkerboard` is not a valid OOXML element | `check_transition_xml` |
+| `<p:flash/>` in base p: namespace | Use `<p14:flash/>` in `mc:AlternateContent` with `<p:fade/>` fallback — Flash is a p14 extension, not in the base OOXML schema | `check_transition_xml` |
+| `<p:zoom/>` for modern zoom transition | Use `<p14:prism/>` in `mc:AlternateContent` — Zoom/Vortex/etc. are p14 extended transitions requiring the `mc:Choice`/`mc:Fallback` pattern | (generator fix) |
+| Invalid underline `u=` values (`heavyDash`, `heavyDotted`, `heavyWavy`) | Use `dashHeavy`, `dottedHeavy`, `wavyHeavy` — OOXML ST_TextUnderlineType uses adjective-noun order | `check_underline_values` |
 
 ---
 

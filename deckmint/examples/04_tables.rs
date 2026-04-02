@@ -11,16 +11,16 @@ fn main() {
     slide.add_text(
         "Styled Table",
         TextOptionsBuilder::new()
-            .pos(0.5, 0.3).size(9.0, 0.8)
+            .bounds(0.5, 0.3, 9.0, 0.8)
             .font_size(28.0).bold()
             .build(),
     );
 
     // Header row using chaining methods
     let header = vec![
-        TableCell::new("Name").bold().fill("2E4057").color("FFFFFF"),
-        TableCell::new("Department").bold().fill("2E4057").color("FFFFFF"),
-        TableCell::new("Score").bold().fill("2E4057").color("FFFFFF").align(AlignH::Right),
+        TableCell::new("Name").bold().fill("#2E4057").color("#FFFFFF"),
+        TableCell::new("Department").bold().fill("#2E4057").color("#FFFFFF"),
+        TableCell::new("Score").bold().fill("#2E4057").color("#FFFFFF").align(AlignH::Right),
     ];
 
     // Data rows
@@ -29,7 +29,7 @@ fn main() {
         vec![
             TableCell::new("Alice"),
             TableCell::new("Engineering"),
-            TableCell::new("98").align(AlignH::Right).color("70AD47"),
+            TableCell::new("98").align(AlignH::Right).color("#70AD47"),
         ],
         vec![
             TableCell::new("Bob"),
@@ -39,14 +39,14 @@ fn main() {
         vec![
             TableCell::new("Carol"),
             TableCell::new("Product").italic(),
-            TableCell::new("92").align(AlignH::Right).color("70AD47"),
+            TableCell::new("92").align(AlignH::Right).color("#70AD47"),
         ],
     ];
 
     slide.add_table(
         rows,
         TableOptionsBuilder::new()
-            .pos(0.5, 1.5).size(9.0, 3.5)
+            .bounds(0.5, 1.5, 9.0, 3.5)
             .col_w(vec![3.0, 3.5, 2.5])
             .font_size(14.0)
             .border(BorderProps::default())

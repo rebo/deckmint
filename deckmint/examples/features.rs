@@ -34,14 +34,14 @@ fn heading(slide: &mut deckmint::Slide, text: &str) {
         text,
         TextOptionsBuilder::new()
             .x(0.3).y(0.1).w(9.4).h(0.7)
-            .font_size(24.0).bold().color("2E4057")
+            .font_size(24.0).bold().color("#2E4057")
             .build(),
     );
     slide.add_shape(
         ShapeType::Rect,
         ShapeOptionsBuilder::new()
             .x(0.3).y(0.75).w(9.4).h(0.04)
-            .fill_color("2E4057")
+            .fill_color("#2E4057")
             .build(),
     );
 }
@@ -53,21 +53,11 @@ fn main() {
 
     // ── Slide master: branded background stripe ─────────────
     {
-        let mut master = SlideMasterDef::default();
-        master.title = "Feature Demo Master".to_string();
-        // Add a thin blue stripe at the bottom of every slide via the master
-        let mut stripe_opts = ShapeOptionsBuilder::new()
-            .x(0.0).y(7.3).w(13.33).h(0.2)
-            .fill_color("2E4057")
-            .build();
-        use deckmint::objects::SlideObject;
-        use deckmint::objects::shape::ShapeObject;
-        master.objects.push(SlideObject::Shape(ShapeObject {
-            object_name: "MasterStripe".to_string(),
-            shape_type: ShapeType::Rect,
-            options: stripe_opts,
-            text: None,
-        }));
+        let mut master = SlideMasterDef::new("Feature Demo Master");
+        master.add_shape(ShapeType::Rect, ShapeOptionsBuilder::new()
+            .bounds(0.0, 7.3, 13.33, 0.2)
+            .fill_color("#2E4057")
+            .build());
         pres.define_master(master);
     }
 
@@ -84,9 +74,9 @@ fn main() {
         // Highlight
         let runs = vec![
             TextRunBuilder::new("Normal · ").font_size(20.0).build(),
-            TextRunBuilder::new("Yellow highlight").font_size(20.0).highlight("FFFF00").build(),
+            TextRunBuilder::new("Yellow highlight").font_size(20.0).highlight("#FFFF00").build(),
             TextRunBuilder::new(" · ").font_size(20.0).build(),
-            TextRunBuilder::new("Cyan highlight").font_size(20.0).highlight("00FFFF").build(),
+            TextRunBuilder::new("Cyan highlight").font_size(20.0).highlight("#00FFFF").build(),
         ];
         s.add_text_runs(runs, TextOptionsBuilder::new().x(0.5).y(1.0).w(9.0).h(0.8).build());
 
@@ -115,14 +105,14 @@ fn main() {
     // ══════════════════════════════════════════════════════════
     {
         let s = pres.add_slide();
-        s.set_background_color("1A1A2E");
+        s.set_background_color("#1A1A2E");
         heading(s, "Text: Glow & Outline");
 
         // Glow — various radii and colors
         let glows = [
-            ("Blue glow", "4472C4", "4472C4", 0.7_f64, 8.0_f64),
-            ("Red glow", "FF0000", "FF6B6B", 0.8, 12.0),
-            ("Green glow", "FFFFFF", "00FF88", 0.6, 6.0),
+            ("Blue glow", "#4472C4", "#4472C4", 0.7_f64, 8.0_f64),
+            ("Red glow", "#FF0000", "#FF6B6B", 0.8, 12.0),
+            ("Green glow", "#FFFFFF", "#00FF88", 0.6, 6.0),
         ];
         for (i, (label, text_color, glow_color, opacity, size)) in glows.iter().enumerate() {
             let runs = vec![
@@ -143,8 +133,8 @@ fn main() {
         // Outline
         let runs = vec![
             TextRunBuilder::new("Outlined text (white fill, black stroke)")
-                .font_size(28.0).bold().color("FFFFFF")
-                .outline(TextOutlineProps { color: "000000".to_string(), size: 1.5 })
+                .font_size(28.0).bold().color("#FFFFFF")
+                .outline(TextOutlineProps { color: "#000000".to_string(), size: 1.5 })
                 .build(),
         ];
         s.add_text_runs(
@@ -167,7 +157,7 @@ fn main() {
         let runs = vec![
             TextRunBuilder::new("Line 1 — first line of paragraph").font_size(16.0).build(),
             TextRunBuilder::new("Line 2 — soft break before this (same paragraph)")
-                .font_size(16.0).color("4472C4").soft_break_before().build(),
+                .font_size(16.0).color("#4472C4").soft_break_before().build(),
             TextRunBuilder::new("Line 3 — another soft break")
                 .font_size(16.0).italic().soft_break_before().build(),
         ];
@@ -181,7 +171,7 @@ fn main() {
             "VERTICAL",
             TextOptionsBuilder::new()
                 .x(7.5).y(0.9).w(0.8).h(3.5)
-                .font_size(16.0).bold().color("C00000")
+                .font_size(16.0).bold().color("#C00000")
                 .text_direction("vert")
                 .build(),
         );
@@ -189,7 +179,7 @@ fn main() {
             "↑ vert270",
             TextOptionsBuilder::new()
                 .x(8.5).y(0.9).w(0.9).h(3.5)
-                .font_size(14.0).color("4472C4")
+                .font_size(14.0).color("#4472C4")
                 .text_direction("vert270")
                 .build(),
         );
@@ -234,7 +224,7 @@ fn main() {
             ShapeType::RoundRect,
             ShapeOptionsBuilder::new()
                 .x(0.5).y(1.0).w(4.0).h(1.0)
-                .fill_color("4472C4")
+                .fill_color("#4472C4")
                 .hyperlink(HyperlinkProps {
                     r_id: 0,
                     slide: None,
@@ -248,7 +238,7 @@ fn main() {
             "▶  Click: GitHub link (shape hyperlink)",
             TextOptionsBuilder::new()
                 .x(0.5).y(1.0).w(4.0).h(1.0)
-                .font_size(14.0).bold().color("FFFFFF")
+                .font_size(14.0).bold().color("#FFFFFF")
                 .valign(AlignV::Middle)
                 .align(AlignH::Center)
                 .build(),
@@ -259,7 +249,7 @@ fn main() {
             ShapeType::RoundRect,
             ShapeOptionsBuilder::new()
                 .x(5.0).y(1.0).w(4.0).h(1.0)
-                .fill_color("ED7D31")
+                .fill_color("#ED7D31")
                 .hyperlink(HyperlinkProps {
                     r_id: 0,
                     slide: Some(1),
@@ -273,7 +263,7 @@ fn main() {
             "▶  Click: Jump to Slide 1 (slide hyperlink)",
             TextOptionsBuilder::new()
                 .x(5.0).y(1.0).w(4.0).h(1.0)
-                .font_size(14.0).bold().color("FFFFFF")
+                .font_size(14.0).bold().color("#FFFFFF")
                 .valign(AlignV::Middle)
                 .align(AlignH::Center)
                 .build(),
@@ -286,7 +276,7 @@ fn main() {
             blur: Some(6.0),
             offset: Some(4.0),
             angle: Some(45.0),
-            color: Some("000000".to_string()),
+            color: Some("#000000".to_string()),
             opacity: Some(0.5),
             rotate_with_shape: true,
         };
@@ -299,7 +289,7 @@ fn main() {
             ShapeType::Pentagon,
             ShapeOptionsBuilder::new()
                 .x(0.5).y(2.5).w(3.0).h(2.0)
-                .fill_color("70AD47")
+                .fill_color("#70AD47")
                 .rotate(30.0)
                 .shadow(shadow_on)
                 .build(),
@@ -316,7 +306,7 @@ fn main() {
             ShapeType::Pentagon,
             ShapeOptionsBuilder::new()
                 .x(5.5).y(2.5).w(3.0).h(2.0)
-                .fill_color("ED7D31")
+                .fill_color("#ED7D31")
                 .rotate(30.0)
                 .shadow(shadow_off)
                 .build(),
@@ -339,20 +329,20 @@ fn main() {
 
         let mut header = TableCell::new("Feature");
         header.options.bold = Some(true);
-        header.options.fill = Some("2E4057".to_string());
-        header.options.color = Some("FFFFFF".to_string());
+        header.options.fill = Some("#2E4057".to_string());
+        header.options.color = Some("#FFFFFF".to_string());
         let mut h2 = TableCell::new("Value");
         h2.options.bold = Some(true);
-        h2.options.fill = Some("2E4057".to_string());
-        h2.options.color = Some("FFFFFF".to_string());
+        h2.options.fill = Some("#2E4057".to_string());
+        h2.options.color = Some("#FFFFFF".to_string());
         let mut h3 = TableCell::new("Link");
         h3.options.bold = Some(true);
-        h3.options.fill = Some("2E4057".to_string());
-        h3.options.color = Some("FFFFFF".to_string());
+        h3.options.fill = Some("#2E4057".to_string());
+        h3.options.color = Some("#FFFFFF".to_string());
 
         // Row with cell hyperlink
         let mut link_cell = TableCell::new("Click me");
-        link_cell.options.color = Some("4472C4".to_string());
+        link_cell.options.color = Some("#4472C4".to_string());
         link_cell.options.underline = Some(true);
         link_cell.options.hyperlink = Some(HyperlinkProps {
             r_id: 0,
@@ -392,7 +382,7 @@ fn main() {
             TextOptionsBuilder::new()
                 .x(0.5).y(2.5).w(9.0).h(1.2)
                 .font_size(40.0).bold()
-                .align(AlignH::Center).color("FFFFFF")
+                .align(AlignH::Center).color("#FFFFFF")
                 .build(),
         );
         s.add_text(
@@ -400,7 +390,7 @@ fn main() {
             TextOptionsBuilder::new()
                 .x(0.5).y(3.8).w(9.0).h(0.8)
                 .font_size(16.0)
-                .align(AlignH::Center).color("FFFFFF")
+                .align(AlignH::Center).color("#FFFFFF")
                 .build(),
         );
     }
@@ -425,7 +415,7 @@ all slides without being added individually.",
 which supports custom slide dimensions.",
             TextOptionsBuilder::new()
                 .x(0.5).y(3.8).w(9.0).h(1.5)
-                .font_size(16.0).color("555555")
+                .font_size(16.0).color("#555555")
                 .build(),
         );
     }
@@ -504,7 +494,7 @@ which supports custom slide dimensions.",
             .container(9.4, 4.6)
             .build();
 
-        let colors = ["4472C4", "ED7D31", "70AD47"];
+        let colors = ["#4472C4", "#ED7D31", "#70AD47"];
         let labels = ["Column 1\n(Fr 1)", "Column 2\n(Fr 1)", "Column 3\n(Fr 1)"];
         for col in 0..3 {
             let r = grid.cell(col, 0);
@@ -515,7 +505,7 @@ which supports custom slide dimensions.",
             s.add_text(labels[col],
                 TextOptionsBuilder::new()
                     .x(r.x).y(r.y).w(r.w).h(r.h)
-                    .font_size(20.0).bold().color("FFFFFF")
+                    .font_size(20.0).bold().color("#FFFFFF")
                     .align(AlignH::Center).valign(AlignV::Middle).build());
         }
     }
@@ -556,16 +546,16 @@ which supports custom slide dimensions.",
         s.add_shape(ShapeType::Rect,
             ShapeOptionsBuilder::new()
                 .x(sidebar.x).y(sidebar.y).w(sidebar.w).h(sidebar.h)
-                .fill_color("2E4057").build());
+                .fill_color("#2E4057").build());
         s.add_text("Sidebar\n(fixed 2.2\")",
             TextOptionsBuilder::new()
                 .x(sidebar.x).y(sidebar.y).w(sidebar.w).h(sidebar.h)
-                .font_size(14.0).bold().color("FFFFFF")
+                .font_size(14.0).bold().color("#FFFFFF")
                 .align(AlignH::Center).valign(AlignV::Middle).build());
 
         // 4 content cells
-        let cell_colors = [("4472C4","Top Left"), ("ED7D31","Top Right"),
-                           ("70AD47","Bottom Left"), ("9E480E","Bottom Right")];
+        let cell_colors = [("#4472C4","Top Left"), ("#ED7D31","Top Right"),
+                           ("#70AD47","Bottom Left"), ("#9E480E","Bottom Right")];
         for (idx, (color, label)) in cell_colors.iter().enumerate() {
             let col = 1 + (idx % 2);
             let row = idx / 2;
@@ -577,7 +567,7 @@ which supports custom slide dimensions.",
             s.add_text(*label,
                 TextOptionsBuilder::new()
                     .x(r.x).y(r.y).w(r.w).h(r.h)
-                    .font_size(13.0).bold().color("FFFFFF")
+                    .font_size(13.0).bold().color("#FFFFFF")
                     .align(AlignH::Center).valign(AlignV::Middle).build());
         }
 
@@ -588,7 +578,7 @@ which supports custom slide dimensions.",
             TextOptionsBuilder::new()
                 .x(centered_label.x).y(centered_label.y)
                 .w(centered_label.w).h(centered_label.h)
-                .font_size(10.0).italic().color("888888")
+                .font_size(10.0).italic().color("#888888")
                 .align(AlignH::Center).build());
     }
 
@@ -608,28 +598,28 @@ which supports custom slide dimensions.",
         let r = grid.cell(0, 0);
         s.add_shape(ShapeType::Rect, ShapeOptionsBuilder::new()
             .x(r.x).y(r.y).w(r.w).h(r.h)
-            .gradient_fill(GradientFill::two_color(0.0, "4472C4", "ED7D31"))
+            .gradient_fill(GradientFill::two_color(0.0, "#4472C4", "#ED7D31"))
             .build());
         s.add_text("Linear 0°\n(left → right)", TextOptionsBuilder::new()
-            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(13.0).bold().color("FFFFFF")
+            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(13.0).bold().color("#FFFFFF")
             .align(AlignH::Center).valign(AlignV::Middle).build());
 
         let r = grid.cell(1, 0);
         s.add_shape(ShapeType::Rect, ShapeOptionsBuilder::new()
             .x(r.x).y(r.y).w(r.w).h(r.h)
-            .gradient_fill(GradientFill::two_color(90.0, "4472C4", "ED7D31"))
+            .gradient_fill(GradientFill::two_color(90.0, "#4472C4", "#ED7D31"))
             .build());
         s.add_text("Linear 90°\n(top → bottom)", TextOptionsBuilder::new()
-            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(13.0).bold().color("FFFFFF")
+            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(13.0).bold().color("#FFFFFF")
             .align(AlignH::Center).valign(AlignV::Middle).build());
 
         let r = grid.cell(2, 0);
         s.add_shape(ShapeType::Rect, ShapeOptionsBuilder::new()
             .x(r.x).y(r.y).w(r.w).h(r.h)
-            .gradient_fill(GradientFill::two_color(45.0, "4472C4", "ED7D31"))
+            .gradient_fill(GradientFill::two_color(45.0, "#4472C4", "#ED7D31"))
             .build());
         s.add_text("Linear 45°\n(diagonal)", TextOptionsBuilder::new()
-            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(13.0).bold().color("FFFFFF")
+            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(13.0).bold().color("#FFFFFF")
             .align(AlignH::Center).valign(AlignV::Middle).build());
 
         // Row 1 — multi-stop, radial, text-box gradient
@@ -637,29 +627,29 @@ which supports custom slide dimensions.",
         s.add_shape(ShapeType::Rect, ShapeOptionsBuilder::new()
             .x(r.x).y(r.y).w(r.w).h(r.h)
             .gradient_fill(GradientFill::linear(90.0, vec![
-                GradientStop::new("FF0000", 0.0),
-                GradientStop::new("FFFF00", 50.0),
-                GradientStop::new("00B050", 100.0),
+                GradientStop::new("#FF0000", 0.0),
+                GradientStop::new("#FFFF00", 50.0),
+                GradientStop::new("#00B050", 100.0),
             ]))
             .build());
         s.add_text("Multi-stop\n(3 colours)", TextOptionsBuilder::new()
-            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(13.0).bold().color("FFFFFF")
+            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(13.0).bold().color("#FFFFFF")
             .align(AlignH::Center).valign(AlignV::Middle).build());
 
         let r = grid.cell(1, 1);
         s.add_shape(ShapeType::Rect, ShapeOptionsBuilder::new()
             .x(r.x).y(r.y).w(r.w).h(r.h)
-            .gradient_fill(GradientFill::radial_two_color("FFFFFF", "4472C4"))
+            .gradient_fill(GradientFill::radial_two_color("#FFFFFF", "#4472C4"))
             .build());
         s.add_text("Radial\n(white → blue)", TextOptionsBuilder::new()
-            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(13.0).bold().color("1F3864")
+            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(13.0).bold().color("#1F3864")
             .align(AlignH::Center).valign(AlignV::Middle).build());
 
         let r = grid.cell(2, 1);
         s.add_text("Gradient\ntext box\nbackground", TextOptionsBuilder::new()
-            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(13.0).bold().color("FFFFFF")
+            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(13.0).bold().color("#FFFFFF")
             .align(AlignH::Center).valign(AlignV::Middle)
-            .gradient_fill(GradientFill::two_color(135.0, "7030A0", "00B0F0"))
+            .gradient_fill(GradientFill::two_color(135.0, "#7030A0", "#00B0F0"))
             .build());
     }
 
@@ -677,18 +667,18 @@ which supports custom slide dimensions.",
             .build();
 
         let anims: &[(&str, AnimationEffect, &str)] = &[
-            ("Blinds H",    AnimationEffect::blinds_in(SplitOrientation::Horizontal), "4472C4"),
-            ("Blinds V",    AnimationEffect::blinds_in(SplitOrientation::Vertical),   "ED7D31"),
-            ("Checker\n(Across)", AnimationEffect::checkerboard_in(CheckerboardDir::Across), "70AD47"),
-            ("Checker\n(Down)",   AnimationEffect::checkerboard_in(CheckerboardDir::Down),   "FFC000"),
-            ("Dissolve In", AnimationEffect::dissolve_in(),                           "5B9BD5"),
-            ("Peek In",     AnimationEffect::peek_in(Direction::Down),                "C55A11"),
-            ("Rand Bars H", AnimationEffect::random_bars_in(SplitOrientation::Horizontal), "7030A0"),
-            ("Rand Bars V", AnimationEffect::random_bars_in(SplitOrientation::Vertical),   "00B0F0"),
-            ("Shape Box",   AnimationEffect::shape_in(ShapeVariant::Box),             "4472C4"),
-            ("Shape Circle",AnimationEffect::shape_in(ShapeVariant::Circle),          "ED7D31"),
-            ("Strips LD",   AnimationEffect::strips_in(StripDir::LeftDown),           "70AD47"),
-            ("Wedge",       AnimationEffect::wedge_in(),                              "FFC000"),
+            ("Blinds H",    AnimationEffect::blinds_in(SplitOrientation::Horizontal), "#4472C4"),
+            ("Blinds V",    AnimationEffect::blinds_in(SplitOrientation::Vertical),   "#ED7D31"),
+            ("Checker\n(Across)", AnimationEffect::checkerboard_in(CheckerboardDir::Across), "#70AD47"),
+            ("Checker\n(Down)",   AnimationEffect::checkerboard_in(CheckerboardDir::Down),   "#FFC000"),
+            ("Dissolve In", AnimationEffect::dissolve_in(),                           "#5B9BD5"),
+            ("Peek In",     AnimationEffect::peek_in(Direction::Down),                "#C55A11"),
+            ("Rand Bars H", AnimationEffect::random_bars_in(SplitOrientation::Horizontal), "#7030A0"),
+            ("Rand Bars V", AnimationEffect::random_bars_in(SplitOrientation::Vertical),   "#00B0F0"),
+            ("Shape Box",   AnimationEffect::shape_in(ShapeVariant::Box),             "#4472C4"),
+            ("Shape Circle",AnimationEffect::shape_in(ShapeVariant::Circle),          "#ED7D31"),
+            ("Strips LD",   AnimationEffect::strips_in(StripDir::LeftDown),           "#70AD47"),
+            ("Wedge",       AnimationEffect::wedge_in(),                              "#FFC000"),
         ];
 
         let cols = 4;
@@ -702,7 +692,7 @@ which supports custom slide dimensions.",
                 .animation(anim.clone())
                 .build());
             s.add_text(*label, TextOptionsBuilder::new()
-                .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("FFFFFF")
+                .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("#FFFFFF")
                 .align(AlignH::Center).valign(AlignV::Middle).build());
         }
 
@@ -710,11 +700,11 @@ which supports custom slide dimensions.",
         let r = grid.cell(3, 3);
         s.add_shape(ShapeType::Ellipse, ShapeOptionsBuilder::new()
             .x(r.x).y(r.y).w(r.w).h(r.h)
-            .fill_color("FF0000")
+            .fill_color("#FF0000")
             .animation(AnimationEffect::wheel_in(3))
             .build());
         s.add_text("Wheel\n(3 spokes)", TextOptionsBuilder::new()
-            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("FFFFFF")
+            .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("#FFFFFF")
             .align(AlignH::Center).valign(AlignV::Middle).build());
     }
 
@@ -732,14 +722,14 @@ which supports custom slide dimensions.",
             .build();
 
         let anims: &[(&str, AnimationEffect, &str)] = &[
-            ("Expand",         AnimationEffect::expand_in(),                         "4472C4"),
-            ("Swivel",         AnimationEffect::swivel_in(),                         "ED7D31"),
-            ("Basic Zoom",     AnimationEffect::basic_zoom_in(),                     "70AD47"),
-            ("Stretch H",      AnimationEffect::stretch_in(Direction::Left),         "FFC000"),
-            ("Centre Revolve", AnimationEffect::centre_revolve_in(),                 "7030A0"),
-            ("Float In ↑",     AnimationEffect::float_in(Direction::Up),             "00B0F0"),
-            ("Grow Turn",      AnimationEffect::grow_turn_in(),                      "C55A11"),
-            ("Rise Up",        AnimationEffect::rise_up_in(),                        "4472C4"),
+            ("Expand",         AnimationEffect::expand_in(),                         "#4472C4"),
+            ("Swivel",         AnimationEffect::swivel_in(),                         "#ED7D31"),
+            ("Basic Zoom",     AnimationEffect::basic_zoom_in(),                     "#70AD47"),
+            ("Stretch H",      AnimationEffect::stretch_in(Direction::Left),         "#FFC000"),
+            ("Centre Revolve", AnimationEffect::centre_revolve_in(),                 "#7030A0"),
+            ("Float In ↑",     AnimationEffect::float_in(Direction::Up),             "#00B0F0"),
+            ("Grow Turn",      AnimationEffect::grow_turn_in(),                      "#C55A11"),
+            ("Rise Up",        AnimationEffect::rise_up_in(),                        "#4472C4"),
         ];
 
         let cols = 4;
@@ -753,7 +743,7 @@ which supports custom slide dimensions.",
                 .animation(anim.clone())
                 .build());
             s.add_text(*label, TextOptionsBuilder::new()
-                .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("FFFFFF")
+                .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("#FFFFFF")
                 .align(AlignH::Center).valign(AlignV::Middle).build());
         }
     }
@@ -772,17 +762,17 @@ which supports custom slide dimensions.",
             .build();
 
         let anims: &[(&str, AnimationEffect, &str)] = &[
-            ("Boomerang",     AnimationEffect::boomerang_in(),    "4472C4"),
-            ("Bounce",        AnimationEffect::bounce_in(),       "ED7D31"),
-            ("Credits",       AnimationEffect::credits_in(),      "70AD47"),
-            ("Curve Up",      AnimationEffect::curve_up_in(),     "FFC000"),
-            ("Drop",          AnimationEffect::drop_in(),         "7030A0"),
-            ("Flip",          AnimationEffect::flip_in(),         "00B0F0"),
-            ("Pinwheel",      AnimationEffect::pinwheel_in(),     "C55A11"),
-            ("Spiral In",     AnimationEffect::spiral_in(),       "4472C4"),
-            ("Basic Swivel",  AnimationEffect::basic_swivel_in(), "ED7D31"),
-            ("Whip",          AnimationEffect::whip_in(),         "70AD47"),
-            ("Spinner",       AnimationEffect::spinner_in(),      "FFC000"),
+            ("Boomerang",     AnimationEffect::boomerang_in(),    "#4472C4"),
+            ("Bounce",        AnimationEffect::bounce_in(),       "#ED7D31"),
+            ("Credits",       AnimationEffect::credits_in(),      "#70AD47"),
+            ("Curve Up",      AnimationEffect::curve_up_in(),     "#FFC000"),
+            ("Drop",          AnimationEffect::drop_in(),         "#7030A0"),
+            ("Flip",          AnimationEffect::flip_in(),         "#00B0F0"),
+            ("Pinwheel",      AnimationEffect::pinwheel_in(),     "#C55A11"),
+            ("Spiral In",     AnimationEffect::spiral_in(),       "#4472C4"),
+            ("Basic Swivel",  AnimationEffect::basic_swivel_in(), "#ED7D31"),
+            ("Whip",          AnimationEffect::whip_in(),         "#70AD47"),
+            ("Spinner",       AnimationEffect::spinner_in(),      "#FFC000"),
         ];
 
         let cols = 4;
@@ -796,7 +786,7 @@ which supports custom slide dimensions.",
                 .animation(anim.clone())
                 .build());
             s.add_text(*label, TextOptionsBuilder::new()
-                .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("FFFFFF")
+                .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("#FFFFFF")
                 .align(AlignH::Center).valign(AlignV::Middle).build());
         }
     }
@@ -809,22 +799,22 @@ which supports custom slide dimensions.",
             .origin(0.3, 0.85).container(9.4, 4.7).build();
 
         let anims: &[(&str, AnimationEffect, &str)] = &[
-            ("Blinds H",      AnimationEffect::blinds_out(SplitOrientation::Horizontal), "4472C4"),
-            ("Blinds V",      AnimationEffect::blinds_out(SplitOrientation::Vertical),   "4472C4"),
-            ("Checkerboard",  AnimationEffect::checkerboard_out(CheckerboardDir::Across), "ED7D31"),
-            ("Dissolve Out",  AnimationEffect::dissolve_out(),                            "A9D18E"),
-            ("Peek Out",      AnimationEffect::peek_out(Direction::Left),                 "FF0000"),
-            ("Random Bars H", AnimationEffect::random_bars_out(SplitOrientation::Horizontal), "70AD47"),
-            ("Random Bars V", AnimationEffect::random_bars_out(SplitOrientation::Vertical),   "70AD47"),
-            ("Shape Box",     AnimationEffect::shape_out(ShapeVariant::Box),              "FFC000"),
-            ("Strips",        AnimationEffect::strips_out(StripDir::LeftDown),            "9DC3E6"),
-            ("Wedge",         AnimationEffect::wedge_out(),                               "FF7F7F"),
-            ("Wheel 2",       AnimationEffect::wheel_out(2),                             "C5A5C5"),
-            ("Wipe Left",     AnimationEffect::wipe_out(Direction::Left),                 "4472C4"),
-            ("Contract",      AnimationEffect::contract_out(),                            "ED7D31"),
-            ("Swivel",        AnimationEffect::swivel_out(),                              "70AD47"),
-            ("Split H",       AnimationEffect::split_out(SplitOrientation::Horizontal),  "FF0000"),
-            ("Zoom Out",      AnimationEffect::zoom_out(),                               "FFC000"),
+            ("Blinds H",      AnimationEffect::blinds_out(SplitOrientation::Horizontal), "#4472C4"),
+            ("Blinds V",      AnimationEffect::blinds_out(SplitOrientation::Vertical),   "#4472C4"),
+            ("Checkerboard",  AnimationEffect::checkerboard_out(CheckerboardDir::Across), "#ED7D31"),
+            ("Dissolve Out",  AnimationEffect::dissolve_out(),                            "#A9D18E"),
+            ("Peek Out",      AnimationEffect::peek_out(Direction::Left),                 "#FF0000"),
+            ("Random Bars H", AnimationEffect::random_bars_out(SplitOrientation::Horizontal), "#70AD47"),
+            ("Random Bars V", AnimationEffect::random_bars_out(SplitOrientation::Vertical),   "#70AD47"),
+            ("Shape Box",     AnimationEffect::shape_out(ShapeVariant::Box),              "#FFC000"),
+            ("Strips",        AnimationEffect::strips_out(StripDir::LeftDown),            "#9DC3E6"),
+            ("Wedge",         AnimationEffect::wedge_out(),                               "#FF7F7F"),
+            ("Wheel 2",       AnimationEffect::wheel_out(2),                             "#C5A5C5"),
+            ("Wipe Left",     AnimationEffect::wipe_out(Direction::Left),                 "#4472C4"),
+            ("Contract",      AnimationEffect::contract_out(),                            "#ED7D31"),
+            ("Swivel",        AnimationEffect::swivel_out(),                              "#70AD47"),
+            ("Split H",       AnimationEffect::split_out(SplitOrientation::Horizontal),  "#FF0000"),
+            ("Zoom Out",      AnimationEffect::zoom_out(),                               "#FFC000"),
         ];
 
         let cols = 4;
@@ -838,7 +828,7 @@ which supports custom slide dimensions.",
                 .animation(anim.clone())
                 .build());
             s.add_text(*label, TextOptionsBuilder::new()
-                .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("FFFFFF")
+                .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("#FFFFFF")
                 .align(AlignH::Center).valign(AlignV::Middle).build());
         }
     }
@@ -851,22 +841,22 @@ which supports custom slide dimensions.",
             .origin(0.3, 0.85).container(9.4, 4.7).build();
 
         let anims: &[(&str, AnimationEffect, &str)] = &[
-            ("Centre Revolve", AnimationEffect::centre_revolve_out(),              "4472C4"),
-            ("Collapse",       AnimationEffect::collapse_out(),                    "ED7D31"),
-            ("Float Out",      AnimationEffect::float_out(Direction::Up),          "A9D18E"),
-            ("Shrink Turn",    AnimationEffect::shrink_turn_out(),                 "FF0000"),
-            ("Sink Down",      AnimationEffect::sink_down_out(),                   "70AD47"),
-            ("Spinner",        AnimationEffect::spinner_out(),                     "FFC000"),
-            ("Basic Zoom",     AnimationEffect::basic_zoom_out(),                  "9DC3E6"),
-            ("Stretchy H",     AnimationEffect::stretchy_out(Direction::Left),     "FF7F7F"),
-            ("Boomerang",      AnimationEffect::boomerang_out(),                   "C5A5C5"),
-            ("Bounce Out",     AnimationEffect::bounce_out(),                      "4472C4"),
-            ("Credits Out",    AnimationEffect::credits_out(),                     "ED7D31"),
-            ("Curve Down",     AnimationEffect::curve_down_out(),                  "70AD47"),
-            ("Drop Out",       AnimationEffect::drop_out(),                        "FF0000"),
-            ("Flip Out",       AnimationEffect::flip_out(),                        "FFC000"),
-            ("Pinwheel Out",   AnimationEffect::pinwheel_out(),                    "9DC3E6"),
-            ("Whip Out",       AnimationEffect::whip_out(),                        "A9D18E"),
+            ("Centre Revolve", AnimationEffect::centre_revolve_out(),              "#4472C4"),
+            ("Collapse",       AnimationEffect::collapse_out(),                    "#ED7D31"),
+            ("Float Out",      AnimationEffect::float_out(Direction::Up),          "#A9D18E"),
+            ("Shrink Turn",    AnimationEffect::shrink_turn_out(),                 "#FF0000"),
+            ("Sink Down",      AnimationEffect::sink_down_out(),                   "#70AD47"),
+            ("Spinner",        AnimationEffect::spinner_out(),                     "#FFC000"),
+            ("Basic Zoom",     AnimationEffect::basic_zoom_out(),                  "#9DC3E6"),
+            ("Stretchy H",     AnimationEffect::stretchy_out(Direction::Left),     "#FF7F7F"),
+            ("Boomerang",      AnimationEffect::boomerang_out(),                   "#C5A5C5"),
+            ("Bounce Out",     AnimationEffect::bounce_out(),                      "#4472C4"),
+            ("Credits Out",    AnimationEffect::credits_out(),                     "#ED7D31"),
+            ("Curve Down",     AnimationEffect::curve_down_out(),                  "#70AD47"),
+            ("Drop Out",       AnimationEffect::drop_out(),                        "#FF0000"),
+            ("Flip Out",       AnimationEffect::flip_out(),                        "#FFC000"),
+            ("Pinwheel Out",   AnimationEffect::pinwheel_out(),                    "#9DC3E6"),
+            ("Whip Out",       AnimationEffect::whip_out(),                        "#A9D18E"),
         ];
 
         let cols = 4;
@@ -880,7 +870,7 @@ which supports custom slide dimensions.",
                 .animation(anim.clone())
                 .build());
             s.add_text(*label, TextOptionsBuilder::new()
-                .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("FFFFFF")
+                .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("#FFFFFF")
                 .align(AlignH::Center).valign(AlignV::Middle).build());
         }
     }
@@ -895,22 +885,22 @@ which supports custom slide dimensions.",
         // on_text=true → animation targets the text label (needed for font/text-property effects)
         // on_text=false → animation targets the shape fill/geometry
         let anims: &[(&str, AnimationEffect, &str, bool)] = &[
-            ("Fill Colour",   AnimationEffect::fill_color("FF0000"),          "4472C4", false),
-            ("Font Colour",   AnimationEffect::font_color("FFFF00"),          "ED7D31", true),
-            ("Line Colour",   AnimationEffect::line_color("00FF00"),          "70AD47", false),
-            ("Transparency",  AnimationEffect::transparency(0.2),             "FF0000", false),
-            ("Bold Flash",    AnimationEffect::bold_flash(),                  "4472C4", true),
-            ("Brush Colour",  AnimationEffect::brush_color("FF8000"),         "ED7D31", false),
-            ("Comp. Colour",  AnimationEffect::complementary_color(),         "70AD47", false),
-            ("Comp. Colour2", AnimationEffect::complementary_color2(),        "FFC000", false),
-            ("Contrast Clr",  AnimationEffect::contrasting_color(),           "9DC3E6", false),
-            ("Darken",        AnimationEffect::darken(),                      "FF7F7F", false),
-            ("Desaturate",    AnimationEffect::desaturate(),                  "C5A5C5", false),
-            ("Lighten",       AnimationEffect::lighten(),                     "4472C4", false),
-            ("Object Colour", AnimationEffect::object_color("70AD47"),        "ED7D31", false),
-            ("Underline",     AnimationEffect::underline(),                   "FF0000", true),
-            ("Spin 360°",     AnimationEffect::spin(360.0),                   "70AD47", false),
-            ("Pulse",         AnimationEffect::pulse(),                       "FFC000", false),
+            ("Fill Colour",   AnimationEffect::fill_color("#FF0000"),          "#4472C4", false),
+            ("Font Colour",   AnimationEffect::font_color("#FFFF00"),          "#ED7D31", true),
+            ("Line Colour",   AnimationEffect::line_color("#00FF00"),          "#70AD47", false),
+            ("Transparency",  AnimationEffect::transparency(0.2),             "#FF0000", false),
+            ("Bold Flash",    AnimationEffect::bold_flash(),                  "#4472C4", true),
+            ("Brush Colour",  AnimationEffect::brush_color("#FF8000"),         "#ED7D31", false),
+            ("Comp. Colour",  AnimationEffect::complementary_color(),         "#70AD47", false),
+            ("Comp. Colour2", AnimationEffect::complementary_color2(),        "#FFC000", false),
+            ("Contrast Clr",  AnimationEffect::contrasting_color(),           "#9DC3E6", false),
+            ("Darken",        AnimationEffect::darken(),                      "#FF7F7F", false),
+            ("Desaturate",    AnimationEffect::desaturate(),                  "#C5A5C5", false),
+            ("Lighten",       AnimationEffect::lighten(),                     "#4472C4", false),
+            ("Object Colour", AnimationEffect::object_color("#70AD47"),        "#ED7D31", false),
+            ("Underline",     AnimationEffect::underline(),                   "#FF0000", true),
+            ("Spin 360°",     AnimationEffect::spin(360.0),                   "#70AD47", false),
+            ("Pulse",         AnimationEffect::pulse(),                       "#FFC000", false),
         ];
 
         let cols = 4;
@@ -923,14 +913,14 @@ which supports custom slide dimensions.",
                 s.add_shape(ShapeType::Rect, ShapeOptionsBuilder::new()
                     .x(r.x).y(r.y).w(r.w).h(r.h).fill_color(*color).build());
                 s.add_text(*label, TextOptionsBuilder::new()
-                    .x(r.x).y(r.y).w(r.w).h(r.h).font_size(10.5).bold().color("FFFFFF")
+                    .x(r.x).y(r.y).w(r.w).h(r.h).font_size(10.5).bold().color("#FFFFFF")
                     .align(AlignH::Center).valign(AlignV::Middle)
                     .animation(anim.clone()).build());
             } else {
                 s.add_shape(ShapeType::Rect, ShapeOptionsBuilder::new()
                     .x(r.x).y(r.y).w(r.w).h(r.h).fill_color(*color).animation(anim.clone()).build());
                 s.add_text(*label, TextOptionsBuilder::new()
-                    .x(r.x).y(r.y).w(r.w).h(r.h).font_size(10.5).bold().color("FFFFFF")
+                    .x(r.x).y(r.y).w(r.w).h(r.h).font_size(10.5).bold().color("#FFFFFF")
                     .align(AlignH::Center).valign(AlignV::Middle).build());
             }
         }
@@ -944,14 +934,14 @@ which supports custom slide dimensions.",
             .origin(0.3, 0.85).container(9.4, 4.7).build();
 
         let anims: &[(&str, AnimationEffect, &str)] = &[
-            ("Colour Pulse",    AnimationEffect::color_pulse("ED7D31"),        "4472C4"),
-            ("Grow w/ Colour",  AnimationEffect::grow_with_color("FF0000"),    "70AD47"),
-            ("Shimmer",         AnimationEffect::shimmer(),                    "FFC000"),
-            ("Teeter",          AnimationEffect::teeter(),                     "9DC3E6"),
-            ("Blink",           AnimationEffect::blink(),                      "FF7F7F"),
-            ("Bold Reveal",     AnimationEffect::bold_reveal(),                "C5A5C5"),
-            ("Wave",            AnimationEffect::wave(),                       "4472C4"),
-            ("Grow/Shrink",     AnimationEffect::grow_shrink(1.5),             "ED7D31"),
+            ("Colour Pulse",    AnimationEffect::color_pulse("#ED7D31"),        "#4472C4"),
+            ("Grow w/ Colour",  AnimationEffect::grow_with_color("#FF0000"),    "#70AD47"),
+            ("Shimmer",         AnimationEffect::shimmer(),                    "#FFC000"),
+            ("Teeter",          AnimationEffect::teeter(),                     "#9DC3E6"),
+            ("Blink",           AnimationEffect::blink(),                      "#FF7F7F"),
+            ("Bold Reveal",     AnimationEffect::bold_reveal(),                "#C5A5C5"),
+            ("Wave",            AnimationEffect::wave(),                       "#4472C4"),
+            ("Grow/Shrink",     AnimationEffect::grow_shrink(1.5),             "#ED7D31"),
         ];
 
         let cols = 4;
@@ -965,7 +955,7 @@ which supports custom slide dimensions.",
                 .animation(anim.clone())
                 .build());
             s.add_text(*label, TextOptionsBuilder::new()
-                .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("FFFFFF")
+                .x(r.x).y(r.y).w(r.w).h(r.h).font_size(11.0).bold().color("#FFFFFF")
                 .align(AlignH::Center).valign(AlignV::Middle).build());
         }
     }
@@ -980,8 +970,8 @@ which supports custom slide dimensions.",
         // Each is a separate text box so two independent animations can fire.
         let demos: &[(&str, u32, u32, &str, &str)] = &[
             // (text, st_idx, end_idx, target_word, color)
-            ("The quick brown fox",    4, 8, "\"quick\"",  "FFFF00"),
-            ("jumps over the lazy dog", 6, 9, "\"over\"",  "FF4444"),
+            ("The quick brown fox",    4, 8, "\"quick\"",  "#FFFF00"),
+            ("jumps over the lazy dog", 6, 9, "\"over\"",  "#FF4444"),
         ];
         for (row_idx, (text, st, end, word, clr)) in demos.iter().enumerate() {
             let y = 1.5 + row_idx as f64 * 2.0;
@@ -989,14 +979,14 @@ which supports custom slide dimensions.",
             s.add_text(
                 &format!("Click to colour {} → #{} (chars {}–{})", word, clr, st, end),
                 TextOptionsBuilder::new()
-                    .x(0.5).y(y - 0.45).w(9.0).h(0.4).font_size(11.0).color("666666").build()
+                    .x(0.5).y(y - 0.45).w(9.0).h(0.4).font_size(11.0).color("#666666").build()
             );
             // Animated text box — only the specified char range changes colour
             s.add_text(
                 *text,
                 TextOptionsBuilder::new()
                     .x(0.5).y(y).w(9.0).h(0.7)
-                    .font_size(28.0).bold().color("222222")
+                    .font_size(28.0).bold().color("#222222")
                     .animation(
                         AnimationEffect::font_color(clr)
                             .with_char_range(*st, *end)
@@ -1008,15 +998,15 @@ which supports custom slide dimensions.",
         s.add_text(
             "Three paragraphs:\nFirst\nSecond\nThird",
             TextOptionsBuilder::new()
-                .x(0.5).y(5.0).w(4.5).h(0.55).font_size(14.0).color("444444").build()
+                .x(0.5).y(5.0).w(4.5).h(0.55).font_size(14.0).color("#444444").build()
         );
         s.add_text(
             "First\nSecond\nThird",
             TextOptionsBuilder::new()
                 .x(5.2).y(5.0).w(4.3).h(0.55)
-                .font_size(14.0).color("222222")
+                .font_size(14.0).color("#222222")
                 .animation(
-                    AnimationEffect::font_color("0070C0")
+                    AnimationEffect::font_color("#0070C0")
                         .with_para_range(1, 1)  // only "Second" (paragraph index 1)
                 )
                 .build()
@@ -1024,7 +1014,7 @@ which supports custom slide dimensions.",
         s.add_text(
             "← click to colour only para 1 (\"Second\") blue",
             TextOptionsBuilder::new()
-                .x(0.5).y(4.55).w(9.0).h(0.4).font_size(11.0).color("666666").build()
+                .x(0.5).y(4.55).w(9.0).h(0.4).font_size(11.0).color("#666666").build()
         );
     }
 
@@ -1036,11 +1026,11 @@ which supports custom slide dimensions.",
         // Row 1: simple sentence with two differently-colored words
         s.add_text_runs(
             vec![
-                TextRunBuilder::new("The ").font_size(28.0).color("222222").build(),
-                TextRunBuilder::new("quick brown").font_size(28.0).color("C45911").bold().build(),
-                TextRunBuilder::new(" fox ").font_size(28.0).color("222222").build(),
-                TextRunBuilder::new("jumps").font_size(28.0).color("2E75B6").bold().build(),
-                TextRunBuilder::new(" over the lazy dog.").font_size(28.0).color("222222").build(),
+                TextRunBuilder::new("The ").font_size(28.0).color("#222222").build(),
+                TextRunBuilder::new("quick brown").font_size(28.0).color("#C45911").bold().build(),
+                TextRunBuilder::new(" fox ").font_size(28.0).color("#222222").build(),
+                TextRunBuilder::new("jumps").font_size(28.0).color("#2E75B6").bold().build(),
+                TextRunBuilder::new(" over the lazy dog.").font_size(28.0).color("#222222").build(),
             ],
             TextOptionsBuilder::new().x(0.5).y(0.9).w(9.0).h(0.7).build(),
         );
@@ -1048,12 +1038,12 @@ which supports custom slide dimensions.",
         // Row 2: traffic-light colors for three clauses
         s.add_text_runs(
             vec![
-                TextRunBuilder::new("Passed: ").font_size(22.0).color("375623").bold().build(),
-                TextRunBuilder::new("all tests green  ").font_size(22.0).color("375623").build(),
-                TextRunBuilder::new("  Warning: ").font_size(22.0).color("7F6000").bold().build(),
-                TextRunBuilder::new("deprecated API  ").font_size(22.0).color("7F6000").build(),
-                TextRunBuilder::new("  Error: ").font_size(22.0).color("C00000").bold().build(),
-                TextRunBuilder::new("build failed").font_size(22.0).color("C00000").build(),
+                TextRunBuilder::new("Passed: ").font_size(22.0).color("#375623").bold().build(),
+                TextRunBuilder::new("all tests green  ").font_size(22.0).color("#375623").build(),
+                TextRunBuilder::new("  Warning: ").font_size(22.0).color("#7F6000").bold().build(),
+                TextRunBuilder::new("deprecated API  ").font_size(22.0).color("#7F6000").build(),
+                TextRunBuilder::new("  Error: ").font_size(22.0).color("#C00000").bold().build(),
+                TextRunBuilder::new("build failed").font_size(22.0).color("#C00000").build(),
             ],
             TextOptionsBuilder::new().x(0.5).y(1.8).w(9.0).h(0.6).build(),
         );
@@ -1061,10 +1051,10 @@ which supports custom slide dimensions.",
         // Row 3: mixed sizes + italic monospace for an inline code snippet
         s.add_text_runs(
             vec![
-                TextRunBuilder::new("Call ").font_size(20.0).color("222222").build(),
+                TextRunBuilder::new("Call ").font_size(20.0).color("#222222").build(),
                 TextRunBuilder::new("slide.add_text_runs(runs, opts)")
-                    .font_size(18.0).color("7030A0").italic().font_face("Courier New").build(),
-                TextRunBuilder::new(" for inline rich text.").font_size(20.0).color("222222").build(),
+                    .font_size(18.0).color("#7030A0").italic().font_face("Courier New").build(),
+                TextRunBuilder::new(" for inline rich text.").font_size(20.0).color("#222222").build(),
             ],
             TextOptionsBuilder::new().x(0.5).y(2.6).w(9.0).h(0.5).build(),
         );
@@ -1073,11 +1063,11 @@ which supports custom slide dimensions.",
         s.add_text_runs(
             vec![
                 TextRunBuilder::new("First sentence stays on line one.")
-                    .font_size(18.0).color("1F3864").break_line().build(),
+                    .font_size(18.0).color("#1F3864").break_line().build(),
                 TextRunBuilder::new("Second sentence is on its own line (")
-                    .font_size(18.0).color("C00000").build(),
-                TextRunBuilder::new("new paragraph").font_size(18.0).color("C00000").bold().build(),
-                TextRunBuilder::new(").").font_size(18.0).color("C00000").build(),
+                    .font_size(18.0).color("#C00000").build(),
+                TextRunBuilder::new("new paragraph").font_size(18.0).color("#C00000").bold().build(),
+                TextRunBuilder::new(").").font_size(18.0).color("#C00000").build(),
             ],
             TextOptionsBuilder::new().x(0.5).y(3.3).w(9.0).h(0.85).build(),
         );
@@ -1087,8 +1077,8 @@ which supports custom slide dimensions.",
             ShapeType::Rect,
             ShapeOptionsBuilder::new()
                 .x(0.3).y(4.35).w(9.4).h(1.5)
-                .fill_color("F2F2F2")
-                .line_color("BFBFBF").line_width(0.5)
+                .fill_color("#F2F2F2")
+                .line_color("#BFBFBF").line_width(0.5)
                 .build(),
         );
         s.add_text(
@@ -1097,7 +1087,7 @@ which supports custom slide dimensions.",
              • .break_line() on a run ends that paragraph and starts a new one",
             TextOptionsBuilder::new()
                 .x(0.5).y(4.4).w(9.0).h(1.4)
-                .font_size(11.0).color("444444")
+                .font_size(11.0).color("#444444")
                 .build(),
         );
     }
@@ -1114,17 +1104,17 @@ which supports custom slide dimensions.",
         s.add_text(
             "Each sentence is a separate text box with its own font_color emphasis.",
             TextOptionsBuilder::new()
-                .x(0.5).y(0.85).w(9.0).h(0.38).font_size(11.5).color("666666").italic().build(),
+                .x(0.5).y(0.85).w(9.0).h(0.38).font_size(11.5).color("#666666").italic().build(),
         );
 
         // Five sentences — alternating orange/blue on successive clicks.
         // All at x=0.5, w=9.0; y spaced by 0.52" (one line at 22pt).
         let sentences: &[(&str, &str)] = &[
-            ("The sun rose slowly over the hills.",          "C45911"),
-            ("Birds began to sing in the distance.",         "2E75B6"),
-            ("A gentle breeze stirred the leaves.",          "C45911"),
-            ("The day had finally begun.",                   "2E75B6"),
-            ("All was calm and still.",                      "C45911"),
+            ("The sun rose slowly over the hills.",          "#C45911"),
+            ("Birds began to sing in the distance.",         "#2E75B6"),
+            ("A gentle breeze stirred the leaves.",          "#C45911"),
+            ("The day had finally begun.",                   "#2E75B6"),
+            ("All was calm and still.",                      "#C45911"),
         ];
         let x = 0.5_f64;
         let y0 = 1.35_f64;
@@ -1135,7 +1125,7 @@ which supports custom slide dimensions.",
                 *text,
                 TextOptionsBuilder::new()
                     .x(x).y(y).w(9.0).h(line_h)
-                    .font_size(22.0).color("333333")
+                    .font_size(22.0).color("#333333")
                     .animation(AnimationEffect::font_color(*color))
                     .build(),
             );
@@ -1145,7 +1135,7 @@ which supports custom slide dimensions.",
         s.add_text(
             "Clicks 1,3,5 → orange     Clicks 2,4 → blue     (each click = one sentence)",
             TextOptionsBuilder::new()
-                .x(0.5).y(4.1).w(9.0).h(0.4).font_size(11.5).color("666666").italic().build(),
+                .x(0.5).y(4.1).w(9.0).h(0.4).font_size(11.5).color("#666666").italic().build(),
         );
 
         // Annotation box
@@ -1153,7 +1143,7 @@ which supports custom slide dimensions.",
             ShapeType::Rect,
             ShapeOptionsBuilder::new()
                 .x(0.3).y(4.6).w(9.4).h(1.0)
-                .fill_color("F2F2F2").line_color("BFBFBF").line_width(0.5).build(),
+                .fill_color("#F2F2F2").line_color("#BFBFBF").line_width(0.5).build(),
         );
         s.add_text(
             "for (text, color) in sentences {\n\
@@ -1163,7 +1153,7 @@ which supports custom slide dimensions.",
              }",
             TextOptionsBuilder::new()
                 .x(0.5).y(4.65).w(9.0).h(0.9)
-                .font_size(10.0).color("333333").font_face("Courier New").build(),
+                .font_size(10.0).color("#333333").font_face("Courier New").build(),
         );
     }
 
@@ -1202,20 +1192,20 @@ which supports custom slide dimensions.",
         // Text: normal
         s.add_text("Normal text box",
             TextOptionsBuilder::new().x(0.3).y(3.2).w(2.5).h(0.8)
-                .font_size(15.0).fill("4472C4").color("FFFFFF")
+                .font_size(15.0).fill("#4472C4").color("#FFFFFF")
                 .align(AlignH::Center).valign(AlignV::Middle).build());
 
         // Text: rotate 30°
         s.add_text("Rotated 30°",
             TextOptionsBuilder::new().x(3.2).y(3.2).w(2.5).h(0.8)
-                .font_size(15.0).fill("ED7D31").color("FFFFFF")
+                .font_size(15.0).fill("#ED7D31").color("#FFFFFF")
                 .align(AlignH::Center).valign(AlignV::Middle)
                 .rotate(30.0).build());
 
         // Text: flip_h
         s.add_text("Flipped H",
             TextOptionsBuilder::new().x(6.2).y(3.2).w(2.5).h(0.8)
-                .font_size(15.0).fill("70AD47").color("FFFFFF")
+                .font_size(15.0).fill("#70AD47").color("#FFFFFF")
                 .align(AlignH::Center).valign(AlignV::Middle)
                 .flip_h().build());
     }
@@ -1234,7 +1224,7 @@ which supports custom slide dimensions.",
                 .x(0.4).y(0.95).w(5.8).h(0.6)
                 .font_size(16.0)
                 .line(ShapeLineProps {
-                    color: Some("4472C4".to_string()),
+                    color: Some("#4472C4".to_string()),
                     width: Some(2.0),
                     dash_type: Some("dash".to_string()),
                     ..Default::default()
@@ -1245,17 +1235,17 @@ which supports custom slide dimensions.",
             TextOptionsBuilder::new()
                 .x(0.4).y(1.65).w(5.8).h(0.6)
                 .font_size(16.0)
-                .line_color("C00000").line_width(1.5)
+                .line_color("#C00000").line_width(1.5)
                 .build());
 
         // Text transparency
         let y = 2.45_f64;
         s.add_text_runs(
             vec![
-                TextRunBuilder::new("Opaque  ").font_size(22.0).color("222222").build(),
-                TextRunBuilder::new("50% trans  ").font_size(22.0).color("C45911").transparency(50.0).build(),
-                TextRunBuilder::new("75% trans  ").font_size(22.0).color("C45911").transparency(75.0).build(),
-                TextRunBuilder::new("90% trans").font_size(22.0).color("C45911").transparency(90.0).build(),
+                TextRunBuilder::new("Opaque  ").font_size(22.0).color("#222222").build(),
+                TextRunBuilder::new("50% trans  ").font_size(22.0).color("#C45911").transparency(50.0).build(),
+                TextRunBuilder::new("75% trans  ").font_size(22.0).color("#C45911").transparency(75.0).build(),
+                TextRunBuilder::new("90% trans").font_size(22.0).color("#C45911").transparency(90.0).build(),
             ],
             TextOptionsBuilder::new().x(0.4).y(y).w(9.0).h(0.6).build(),
         );
@@ -1275,11 +1265,11 @@ which supports custom slide dimensions.",
         s.add_text_runs(
             vec![
                 TextRunBuilder::new("Red underline  ").font_size(22.0)
-                    .underline("sng").underline_color("FF0000").build(),
+                    .underline("sng").underline_color("#FF0000").build(),
                 TextRunBuilder::new("Green heavy  ").font_size(22.0)
-                    .underline("heavy").underline_color("00B050").build(),
+                    .underline("heavy").underline_color("#00B050").build(),
                 TextRunBuilder::new("Blue wavy").font_size(22.0)
-                    .underline("wavy").underline_color("4472C4").build(),
+                    .underline("wavy").underline_color("#4472C4").build(),
             ],
             TextOptionsBuilder::new().x(0.4).y(y).w(9.0).h(0.6).build(),
         );
@@ -1294,9 +1284,9 @@ which supports custom slide dimensions.",
 
         // Row 1: Pie slices at different sweep angles
         let sweeps: &[(f64, f64, &str, &str)] = &[
-            (0.0,  90.0,  "4472C4", "Pie 90°"),
-            (0.0, 180.0,  "ED7D31", "Pie 180°"),
-            (0.0, 270.0,  "70AD47", "Pie 270°"),
+            (0.0,  90.0,  "#4472C4", "Pie 90°"),
+            (0.0, 180.0,  "#ED7D31", "Pie 180°"),
+            (0.0, 270.0,  "#70AD47", "Pie 270°"),
         ];
         for (i, (start, swing, color, label)) in sweeps.iter().enumerate() {
             let x = 0.4 + i as f64 * 3.1;
@@ -1313,8 +1303,8 @@ which supports custom slide dimensions.",
 
         // Row 2: BlockArc with different thicknesses
         let arcs: &[(f64, f64, &str, &str)] = &[
-            (0.0, 180.0, "C45911", "BlockArc thick"),
-            (0.0, 270.0, "7030A0", "BlockArc thin"),
+            (0.0, 180.0, "#C45911", "BlockArc thick"),
+            (0.0, 270.0, "#7030A0", "BlockArc thin"),
         ];
         for (i, (start, swing, color, label)) in arcs.iter().enumerate() {
             let x = 0.4 + i as f64 * 4.7;
@@ -1340,14 +1330,14 @@ which supports custom slide dimensions.",
         heading(s, "Pattern Fill");
 
         let patterns = [
-            (PatternType::Cross,     "Cross",     "4472C4", "FFFFFF"),
-            (PatternType::DotGrid,   "DotGrid",   "ED7D31", "FFFFFF"),
-            (PatternType::HorzBrick, "HorzBrick", "70AD47", "FFF2CC"),
-            (PatternType::Trellis,   "Trellis",   "9966CC", "E2EFDA"),
-            (PatternType::Wave,      "Wave",      "C00000", "FFFFFF"),
-            (PatternType::ZigZag,    "ZigZag",    "0070C0", "DEEAF1"),
-            (PatternType::LgConfetti,"LgConfetti","FF0000", "FFFF00"),
-            (PatternType::Sphere,    "Sphere",    "333333", "EEEEEE"),
+            (PatternType::Cross,     "Cross",     "#4472C4", "#FFFFFF"),
+            (PatternType::DotGrid,   "DotGrid",   "#ED7D31", "#FFFFFF"),
+            (PatternType::HorzBrick, "HorzBrick", "#70AD47", "#FFF2CC"),
+            (PatternType::Trellis,   "Trellis",   "#9966CC", "#E2EFDA"),
+            (PatternType::Wave,      "Wave",      "#C00000", "#FFFFFF"),
+            (PatternType::ZigZag,    "ZigZag",    "#0070C0", "#DEEAF1"),
+            (PatternType::LgConfetti,"LgConfetti","#FF0000", "#FFFF00"),
+            (PatternType::Sphere,    "Sphere",    "#333333", "#EEEEEE"),
         ];
 
         for (i, &(ref pat, label, fg, bg)) in patterns.iter().enumerate() {
@@ -1365,14 +1355,14 @@ which supports custom slide dimensions.",
                         fg_color: fg.to_string(),
                         bg_color: bg.to_string(),
                     })
-                    .line_color("CCCCCC").line_width(0.5)
+                    .line_color("#CCCCCC").line_width(0.5)
                     .build(),
             );
             s.add_text(
                 label,
                 TextOptionsBuilder::new()
                     .x(x).y(y + 1.22).w(2.2).h(0.3)
-                    .font_size(10.0).align(AlignH::Center).color("333333")
+                    .font_size(10.0).align(AlignH::Center).color("#333333")
                     .build(),
             );
         }
@@ -1390,7 +1380,7 @@ which supports custom slide dimensions.",
         s.add_shape(ShapeType::Rect,
             ShapeOptionsBuilder::new()
                 .x(0.3).y(1.0).w(2.8).h(2.5)
-                .fill_color("4472C4")
+                .fill_color("#4472C4")
                 .custom_geometry(vec![
                     CGP::MoveTo(0.5, 0.0),
                     CGP::LineTo(1.0, 1.0),
@@ -1405,7 +1395,7 @@ which supports custom slide dimensions.",
         s.add_shape(ShapeType::Rect,
             ShapeOptionsBuilder::new()
                 .x(3.5).y(1.0).w(2.8).h(2.5)
-                .fill_color("ED7D31")
+                .fill_color("#ED7D31")
                 .custom_geometry(vec![
                     CGP::MoveTo(0.0, 0.25),
                     CGP::LineTo(0.6, 0.25),
@@ -1424,7 +1414,7 @@ which supports custom slide dimensions.",
         s.add_shape(ShapeType::Rect,
             ShapeOptionsBuilder::new()
                 .x(6.7).y(1.0).w(2.8).h(2.5)
-                .fill_color("70AD47")
+                .fill_color("#70AD47")
                 .custom_geometry(vec![
                     CGP::MoveTo(0.15, 0.0),
                     CGP::LineTo(0.85, 0.0),
@@ -1452,28 +1442,28 @@ which supports custom slide dimensions.",
         s.add_shape(ShapeType::RoundRect,
             ShapeOptionsBuilder::new()
                 .x(0.5).y(1.2).w(4.0).h(2.0)
-                .fill_color("4472C4")
+                .fill_color("#4472C4")
                 .alt_text("A blue rounded rectangle used as a decorative accent")
                 .build());
         s.add_text("▲ Has alt text: \"A blue rounded rectangle…\"",
             TextOptionsBuilder::new().x(0.5).y(3.3).w(4.0).h(0.5)
-                .font_size(11.0).color("666666").build());
+                .font_size(11.0).color("#666666").build());
 
         s.add_shape(ShapeType::Ellipse,
             ShapeOptionsBuilder::new()
                 .x(5.5).y(1.2).w(3.5).h(2.0)
-                .fill_color("ED7D31")
+                .fill_color("#ED7D31")
                 .alt_text("Orange ellipse — chart placeholder")
                 .build());
         s.add_text("▲ Has alt text: \"Orange ellipse — chart placeholder\"",
             TextOptionsBuilder::new().x(5.5).y(3.3).w(4.0).h(0.5)
-                .font_size(11.0).color("666666").build());
+                .font_size(11.0).color("#666666").build());
 
         s.add_text(
             "Alt text is set via .alt_text(\"...\") on ShapeOptionsBuilder.\n\
              It maps to descr=\"...\" on <p:cNvPr> and is read by screen readers.",
             TextOptionsBuilder::new().x(0.4).y(4.2).w(9.0).h(1.0)
-                .font_size(14.0).color("444444").build());
+                .font_size(14.0).color("#444444").build());
     }
 
     // ══════════════════════════════════════════════════════════
@@ -1481,7 +1471,7 @@ which supports custom slide dimensions.",
     // ══════════════════════════════════════════════════════════
     {
         let s = pres.add_slide();
-        s.set_background_color_transparency("4472C4", 60.0);
+        s.set_background_color_transparency("#4472C4", 60.0);
         heading(s, "New: Background Color + Transparency");
         s.add_text(
             "Background: #4472C4 at 60% transparency\n(set via set_background_color_transparency())",
@@ -1520,14 +1510,14 @@ which supports custom slide dimensions.",
                 ShapeOptionsBuilder::new()
                     .x(x).y(y).w(2.9).h(1.0)
                     .fill_color_value(fill_color)
-                    .line_color("CCCCCC").line_width(0.5)
+                    .line_color("#CCCCCC").line_width(0.5)
                     .build(),
             );
             s.add_text(
                 label,
                 TextOptionsBuilder::new()
                     .x(x).y(y + 1.02).w(2.9).h(0.4)
-                    .font_size(10.5).align(AlignH::Center).color("333333")
+                    .font_size(10.5).align(AlignH::Center).color("#333333")
                     .build(),
             );
         }
@@ -1536,7 +1526,7 @@ which supports custom slide dimensions.",
              emits <a:schemeClr val=\"accent1\"><a:tint val=\"40000\"/></a:schemeClr>",
             TextOptionsBuilder::new()
                 .x(0.3).y(4.5).w(9.4).h(0.9)
-                .font_size(11.0).color("666666").italic()
+                .font_size(11.0).color("#666666").italic()
                 .build(),
         );
     }
@@ -1553,7 +1543,7 @@ which supports custom slide dimensions.",
             w: Some(deckmint::Coord::Inches(1.5)),
             h: Some(deckmint::Coord::Inches(0.4)),
             font_size: Some(14.0),
-            color: Some("444444".to_string()),
+            color: Some("#444444".to_string()),
             bold: true,
             align: Some("r".to_string()),
             ..Default::default()
@@ -1577,11 +1567,11 @@ which supports custom slide dimensions.",
         heading(s, "Advanced Hyperlink Actions");
 
         let actions: &[(&str, HyperlinkAction, &str)] = &[
-            ("Next Slide →",   HyperlinkAction::NextSlide,  "4472C4"),
-            ("← Prev Slide",   HyperlinkAction::PrevSlide,  "ED7D31"),
-            ("⏮ First Slide",  HyperlinkAction::FirstSlide, "70AD47"),
-            ("⏭ Last Slide",   HyperlinkAction::LastSlide,  "9966CC"),
-            ("✕ End Show",     HyperlinkAction::EndShow,    "C00000"),
+            ("Next Slide →",   HyperlinkAction::NextSlide,  "#4472C4"),
+            ("← Prev Slide",   HyperlinkAction::PrevSlide,  "#ED7D31"),
+            ("⏮ First Slide",  HyperlinkAction::FirstSlide, "#70AD47"),
+            ("⏭ Last Slide",   HyperlinkAction::LastSlide,  "#9966CC"),
+            ("✕ End Show",     HyperlinkAction::EndShow,    "#C00000"),
         ];
 
         for (i, &(label, ref action, color)) in actions.iter().enumerate() {
@@ -1605,7 +1595,7 @@ which supports custom slide dimensions.",
                 label,
                 TextOptionsBuilder::new()
                     .x(x).y(y + 0.15).w(2.7).h(0.6)
-                    .font_size(14.0).bold().align(AlignH::Center).color("FFFFFF")
+                    .font_size(14.0).bold().align(AlignH::Center).color("#FFFFFF")
                     .build(),
             );
         }
@@ -1613,7 +1603,7 @@ which supports custom slide dimensions.",
             "Click any button in Slideshow mode — each fires a navigation action with no URL relationship.",
             TextOptionsBuilder::new()
                 .x(0.3).y(4.3).w(9.4).h(0.5)
-                .font_size(11.0).color("666666").italic()
+                .font_size(11.0).color("#666666").italic()
                 .build(),
         );
     }
@@ -1645,7 +1635,7 @@ which supports custom slide dimensions.",
         s.add_text(
             types_text,
             TextOptionsBuilder::new()
-                .x(0.5).y(2.5).w(9.0).h(2.0).font_size(14.0).color("444444").build(),
+                .x(0.5).y(2.5).w(9.0).h(2.0).font_size(14.0).color("#444444").build(),
         );
     }
 
@@ -1681,14 +1671,14 @@ which supports custom slide dimensions.",
                 ShapeType::Rect,
                 ShapeOptionsBuilder::new()
                     .x(*bx).y(*by).w(1.5).h(0.8)
-                    .fill_color("4472C4").line_color("1F3864").line_width(1.5)
+                    .fill_color("#4472C4").line_color("#1F3864").line_width(1.5)
                     .build(),
             );
             s.add_text(
                 lbl,
                 TextOptionsBuilder::new()
                     .x(*bx).y(*by + 0.1).w(1.5).h(0.6)
-                    .font_size(14.0).bold().align(AlignH::Center).color("FFFFFF")
+                    .font_size(14.0).bold().align(AlignH::Center).color("#FFFFFF")
                     .build(),
             );
         }
@@ -1702,7 +1692,7 @@ which supports custom slide dimensions.",
                 x2: Some(deckmint::Coord::Inches(4.5)),
                 y2: Some(deckmint::Coord::Inches(1.6)),
                 line: Some(ShapeLineProps {
-                    color: Some("ED7D31".to_string()),
+                    color: Some("#ED7D31".to_string()),
                     width: Some(2.0),
                     end_arrow_type: Some("triangle".to_string()),
                     ..Default::default()
@@ -1720,7 +1710,7 @@ which supports custom slide dimensions.",
                 x2: Some(deckmint::Coord::Inches(8.0)),
                 y2: Some(deckmint::Coord::Inches(1.6)),
                 line: Some(ShapeLineProps {
-                    color: Some("70AD47".to_string()),
+                    color: Some("#70AD47".to_string()),
                     width: Some(2.0),
                     end_arrow_type: Some("triangle".to_string()),
                     ..Default::default()
@@ -1738,7 +1728,7 @@ which supports custom slide dimensions.",
                 x2: Some(deckmint::Coord::Inches(8.75)),
                 y2: Some(deckmint::Coord::Inches(3.5)),
                 line: Some(ShapeLineProps {
-                    color: Some("9966CC".to_string()),
+                    color: Some("#9966CC".to_string()),
                     width: Some(2.0),
                     dash_type: Some("dash".to_string()),
                     end_arrow_type: Some("triangle".to_string()),
@@ -1753,7 +1743,7 @@ which supports custom slide dimensions.",
              add_connector(ConnectorType::Straight/Elbow/Curved, ConnectorOptions { x1, y1, x2, y2, line, … })",
             TextOptionsBuilder::new()
                 .x(0.3).y(4.1).w(9.4).h(0.9)
-                .font_size(11.0).color("666666").italic()
+                .font_size(11.0).color("#666666").italic()
                 .build(),
         );
     }
@@ -1829,7 +1819,7 @@ which supports custom slide dimensions.",
             "table_style_id(\"{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}\")  →  OOXML built-in style applied",
             TextOptionsBuilder::new()
                 .x(0.3).y(4.1).w(9.4).h(0.4)
-                .font_size(11.0).color("666666").italic()
+                .font_size(11.0).color("#666666").italic()
                 .build(),
         );
 
@@ -1838,7 +1828,7 @@ which supports custom slide dimensions.",
             "AlignH::Distribute  →  text distributed evenly across width",
             TextOptionsBuilder::new()
                 .x(0.5).y(4.6).w(9.0).h(0.5)
-                .font_size(14.0).align(AlignH::Distribute).color("2E4057")
+                .font_size(14.0).align(AlignH::Distribute).color("#2E4057")
                 .build(),
         );
     }
@@ -1855,14 +1845,14 @@ which supports custom slide dimensions.",
             ShapeType::Rect,
             ShapeOptionsBuilder::new()
                 .x(1.0).y(1.5).w(2.5).h(1.5)
-                .fill_color("4472C4")
+                .fill_color("#4472C4")
                 .build(),
         );
         s.add_text(
             "1 — On Click",
             TextOptionsBuilder::new()
                 .x(1.0).y(1.5).w(2.5).h(1.5)
-                .font_size(14.0).color("FFFFFF").align(AlignH::Center).valign(AlignV::Middle)
+                .font_size(14.0).color("#FFFFFF").align(AlignH::Center).valign(AlignV::Middle)
                 .animation(AnimationEffect::fade_in())
                 .build(),
         );
@@ -1871,8 +1861,8 @@ which supports custom slide dimensions.",
             "2 — With Previous",
             TextOptionsBuilder::new()
                 .x(4.0).y(1.5).w(2.5).h(1.5)
-                .font_size(14.0).color("FFFFFF").align(AlignH::Center).valign(AlignV::Middle)
-                .fill("ED7D31".to_string())
+                .font_size(14.0).color("#FFFFFF").align(AlignH::Center).valign(AlignV::Middle)
+                .fill("#ED7D31".to_string())
                 .animation(AnimationEffect::fade_in().with_previous())
                 .build(),
         );
@@ -1881,8 +1871,8 @@ which supports custom slide dimensions.",
             "3 — After Previous",
             TextOptionsBuilder::new()
                 .x(7.0).y(1.5).w(2.5).h(1.5)
-                .font_size(14.0).color("FFFFFF").align(AlignH::Center).valign(AlignV::Middle)
-                .fill("70AD47".to_string())
+                .font_size(14.0).color("#FFFFFF").align(AlignH::Center).valign(AlignV::Middle)
+                .fill("#70AD47".to_string())
                 .animation(AnimationEffect::fly_in(Direction::Down).after_previous())
                 .build(),
         );
@@ -1891,8 +1881,8 @@ which supports custom slide dimensions.",
             "4 — After + 500ms delay",
             TextOptionsBuilder::new()
                 .x(4.0).y(3.5).w(2.5).h(1.5)
-                .font_size(14.0).color("FFFFFF").align(AlignH::Center).valign(AlignV::Middle)
-                .fill("A855C7".to_string())
+                .font_size(14.0).color("#FFFFFF").align(AlignH::Center).valign(AlignV::Middle)
+                .fill("#A855C7".to_string())
                 .animation(AnimationEffect::zoom_in().after_previous().delay(500))
                 .build(),
         );
@@ -1902,7 +1892,7 @@ which supports custom slide dimensions.",
              then 3 auto-plays after they finish, then 4 after a 500 ms delay.",
             TextOptionsBuilder::new()
                 .x(0.3).y(5.1).w(9.4).h(0.7)
-                .font_size(11.0).color("666666").italic()
+                .font_size(11.0).color("#666666").italic()
                 .build(),
         );
     }
@@ -1935,7 +1925,7 @@ which supports custom slide dimensions.",
              TextRunBuilder::new(\"\").field(FieldType::SlideNumber).build()",
             TextOptionsBuilder::new()
                 .x(0.3).y(4.5).w(9.4).h(0.9)
-                .font_size(11.0).color("666666").italic()
+                .font_size(11.0).color("#666666").italic()
                 .build(),
         );
     }
@@ -1957,7 +1947,7 @@ which supports custom slide dimensions.",
             lorem,
             TextOptionsBuilder::new()
                 .x(0.5).y(1.2).w(9.0).h(2.5)
-                .font_size(14.0).color("333333")
+                .font_size(14.0).color("#333333")
                 .columns(2).column_spacing(0.4)
                 .build(),
         );
@@ -1965,14 +1955,14 @@ which supports custom slide dimensions.",
             "Three columns:",
             TextOptionsBuilder::new()
                 .x(0.5).y(3.8).w(9.0).h(0.4)
-                .font_size(12.0).bold().color("2E4057")
+                .font_size(12.0).bold().color("#2E4057")
                 .build(),
         );
         s.add_text(
             lorem,
             TextOptionsBuilder::new()
                 .x(0.5).y(4.2).w(9.0).h(1.8)
-                .font_size(11.0).color("333333")
+                .font_size(11.0).color("#333333")
                 .columns(3).column_spacing(0.3)
                 .build(),
         );
@@ -2003,7 +1993,7 @@ which supports custom slide dimensions.",
             "Accent1 tint 40% → Accent1 → Accent1 shade 50%",
             TextOptionsBuilder::new()
                 .x(0.5).y(3.6).w(9.0).h(0.5)
-                .font_size(12.0).color("333333").align(AlignH::Center)
+                .font_size(12.0).color("#333333").align(AlignH::Center)
                 .build(),
         );
 
@@ -2013,7 +2003,7 @@ which supports custom slide dimensions.",
             ShapeOptionsBuilder::new()
                 .x(0.5).y(4.2).w(9.0).h(1.2)
                 .gradient_fill(GradientFill::linear(90.0, vec![
-                    GradientStop::new("FFFFFF", 0.0),
+                    GradientStop::new("#FFFFFF", 0.0),
                     GradientStop::from_color(Color::Theme(SchemeColor::Accent2), 100.0),
                 ]))
                 .build(),
@@ -2022,7 +2012,7 @@ which supports custom slide dimensions.",
             "White (hex) → Accent2 (theme) at 90°",
             TextOptionsBuilder::new()
                 .x(0.5).y(5.5).w(9.0).h(0.4)
-                .font_size(12.0).color("333333").align(AlignH::Center)
+                .font_size(12.0).color("#333333").align(AlignH::Center)
                 .build(),
         );
     }
@@ -2039,7 +2029,7 @@ which supports custom slide dimensions.",
              .contrast(-20.0)     // less contrast\n  .grayscale()         // b&w",
             TextOptionsBuilder::new()
                 .x(3.0).y(1.5).w(6.5).h(2.5)
-                .font_size(14.0).color("2E4057")
+                .font_size(14.0).color("#2E4057")
                 .build(),
         );
 
@@ -2047,7 +2037,7 @@ which supports custom slide dimensions.",
             "Emits <a:lum bright=\"30000\" contrast=\"-20000\"/> and <a:grayscl/> inside <a:blip>",
             TextOptionsBuilder::new()
                 .x(0.3).y(4.5).w(9.4).h(0.9)
-                .font_size(11.0).color("666666").italic()
+                .font_size(11.0).color("#666666").italic()
                 .build(),
         );
     }

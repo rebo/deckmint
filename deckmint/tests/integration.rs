@@ -1373,11 +1373,12 @@ fn animation_font_color_emits_preset2_emph() {
 }
 
 #[test]
-fn animation_line_color_emits_preset3_emph() {
-    let xml = make_slide_with_anim(AnimationEffect::line_color("00FF00"));
-    assert!(xml.contains("presetID=\"3\""), "line color preset id");
+fn animation_line_color_emits_preset7_emph() {
+    let xml = make_slide_with_anim(AnimationEffect::line_color("#00FF00"));
+    assert!(xml.contains("presetID=\"7\""), "line color preset id");
     assert!(xml.contains("presetClass=\"emph\""), "emphasis class");
-    assert!(xml.contains("strokecolor"), "stroke attr");
+    assert!(xml.contains("stroke.color"), "stroke.color attr");
+    assert!(xml.contains("stroke.on"), "stroke.on companion set");
 }
 
 #[test]
@@ -1392,12 +1393,12 @@ fn animation_transparency_emits_preset4_emph() {
 // ── Emphasis — Subtle ─────────────────────────────────────────────────────────
 
 #[test]
-fn animation_bold_flash_emits_preset5_emph() {
+fn animation_bold_flash_emits_preset10_emph() {
     let xml = make_slide_with_anim(AnimationEffect::bold_flash());
-    assert!(xml.contains("presetID=\"5\""), "bold flash preset id");
+    assert!(xml.contains("presetID=\"10\""), "bold flash preset id");
     assert!(xml.contains("presetClass=\"emph\""), "emphasis class");
     assert!(xml.contains("style.fontWeight"), "fontWeight attr");
-    assert!(xml.contains("autoRev=\"1\""), "auto-reverse");
+    assert!(xml.contains("override=\"childStyle\""), "childStyle override");
 }
 
 #[test]
@@ -1499,12 +1500,13 @@ fn animation_grow_with_color_emits_preset19_emph() {
 }
 
 #[test]
-fn animation_shimmer_emits_preset20_emph() {
+fn animation_shimmer_emits_preset36_emph() {
     let xml = make_slide_with_anim(AnimationEffect::shimmer());
-    assert!(xml.contains("presetID=\"20\""), "shimmer preset id");
+    assert!(xml.contains("presetID=\"36\""), "shimmer preset id");
     assert!(xml.contains("presetClass=\"emph\""), "emphasis class");
-    assert!(xml.contains("repeatCount=\"3\""), "3 cycles");
-    assert!(xml.contains("style.opacity"), "opacity attr");
+    assert!(xml.contains("<p:iterate type=\"lt\""), "letter-by-letter iterate");
+    assert!(xml.contains("<p:animScale>"), "scale component");
+    assert!(xml.contains("ppt_x"), "x shift component");
 }
 
 #[test]
@@ -1527,12 +1529,12 @@ fn animation_blink_emits_preset22_emph() {
 }
 
 #[test]
-fn animation_bold_reveal_emits_preset23_emph() {
+fn animation_bold_reveal_emits_preset15_emph() {
     let xml = make_slide_with_anim(AnimationEffect::bold_reveal());
-    assert!(xml.contains("presetID=\"23\""), "bold reveal preset id");
+    assert!(xml.contains("presetID=\"15\""), "bold reveal preset id");
     assert!(xml.contains("presetClass=\"emph\""), "emphasis class");
     assert!(xml.contains("style.fontWeight"), "bold component");
-    assert!(xml.contains("<p:animScale>"), "scale component");
+    assert!(xml.contains("<p:iterate type=\"lt\""), "letter-by-letter iterate");
 }
 
 #[test]
@@ -1541,4 +1543,116 @@ fn animation_wave_emits_preset24_emph() {
     assert!(xml.contains("presetID=\"24\""), "wave preset id");
     assert!(xml.contains("presetClass=\"emph\""), "emphasis class");
     assert!(xml.contains("style.rotation"), "rotation attr");
+}
+
+// ─── Master slide ergonomics ─────────────────────────────
+
+#[test]
+fn master_add_text_produces_object() {
+    use deckmint::SlideMasterDef;
+    let mut master = SlideMasterDef::new("Test Master");
+    master.add_text("Footer", TextOptionsBuilder::new().pos(0.0, 7.0).size(10.0, 0.5).build());
+    assert_eq!(master.objects.len(), 1);
+}
+
+#[test]
+fn master_add_shape_and_text() {
+    use deckmint::SlideMasterDef;
+    let mut master = SlideMasterDef::new("Branded");
+    master.set_background_color("1F3864");
+    master.add_shape(ShapeType::Rect, ShapeOptionsBuilder::new()
+        .pos(0.0, 7.0).size(10.0, 0.5).fill_color("2E4057").build());
+    master.add_text("ACME Corp", TextOptionsBuilder::new()
+        .pos(0.5, 7.0).size(4.0, 0.5).color("FFFFFF").build());
+    assert_eq!(master.objects.len(), 2);
+    assert_eq!(master.background_color.as_deref(), Some("1F3864"));
+}
+
+#[test]
+fn master_add_image_registers_media() {
+    use deckmint::SlideMasterDef;
+    // 1x1 red PNG
+    let png = vec![
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+        0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
+        0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+        0x00, 0x00, 0x03, 0x00, 0x01, 0x36, 0x28, 0x19,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+        0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
+    let mut master = SlideMasterDef::new("With Logo");
+    master.add_image(png, "png", Default::default());
+    assert_eq!(master.objects.len(), 1);
+
+    // Verify the image ends up in the archive
+    let mut pres = Presentation::new();
+    pres.define_master(master);
+    pres.add_slide();
+    let bytes = pres.write().unwrap();
+    let zip = open_zip(&bytes);
+    let media_names: Vec<String> = (0..zip.len())
+        .map(|i| zip.name_for_index(i).unwrap().to_string())
+        .filter(|n| n.starts_with("ppt/media/"))
+        .collect();
+    assert!(!media_names.is_empty(), "master image should be in archive");
+}
+
+#[test]
+fn promote_slide_to_master_transfers_objects() {
+    let mut pres = Presentation::new();
+    let s = pres.add_slide();
+    s.set_background_color("1F3864");
+    s.add_shape(ShapeType::Rect, ShapeOptionsBuilder::new()
+        .pos(0.0, 7.0).size(10.0, 0.5).fill_color("2E4057").build());
+    s.add_text("Footer", TextOptionsBuilder::new().pos(0.5, 7.0).size(4.0, 0.5).build());
+    assert_eq!(pres.slide_count(), 1);
+
+    let master = pres.promote_slide_to_master(0, "Corporate");
+    assert_eq!(pres.slide_count(), 0);
+    assert_eq!(master.objects.len(), 2);
+    assert_eq!(master.background_color.as_deref(), Some("1F3864"));
+}
+
+#[test]
+fn master_with_image_produces_valid_pptx() {
+    use deckmint::SlideMasterDef;
+    // 1x1 red PNG
+    let png = vec![
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+        0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
+        0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+        0x00, 0x00, 0x03, 0x00, 0x01, 0x36, 0x28, 0x19,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+        0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
+    let mut master = SlideMasterDef::new("Logo Master");
+    master.add_image(png, "png", Default::default());
+
+    let mut pres = Presentation::new();
+    pres.define_master(master);
+    let slide = pres.add_slide();
+    slide.add_text("Hello", TextOptionsBuilder::new().pos(1.0, 1.0).size(8.0, 1.0).build());
+
+    let bytes = pres.write().unwrap();
+    let zip = open_zip(&bytes);
+
+    // Verify the master rels contain the image relationship
+    let mut rels_content = String::new();
+    let mut archive = open_zip(&bytes);
+    archive.by_name("ppt/slideMasters/_rels/slideMaster1.xml.rels").unwrap()
+        .read_to_string(&mut rels_content).unwrap();
+    assert!(rels_content.contains("relationships/image"), "master rels should contain image relationship");
+
+    // Verify media file exists in the archive
+    let media_names: Vec<String> = (0..zip.len())
+        .map(|i| zip.name_for_index(i).unwrap().to_string())
+        .filter(|n| n.starts_with("ppt/media/"))
+        .collect();
+    assert!(!media_names.is_empty(), "media file should exist in archive: found {:?}", media_names);
 }

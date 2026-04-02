@@ -15,9 +15,9 @@ fn main() {
     s.add_text(
         "Welcome",
         TextOptionsBuilder::new()
-            .pos(0.5, 2.0).size(9.0, 1.5)
+            .bounds(0.5, 2.0, 9.0, 1.5)
             .font_size(44.0).bold().align(AlignH::Center)
-            .color("4472C4")
+            .color("#4472C4")
             .build(),
     );
     s.add_notes("Welcome the audience. Introduce the topic.");
@@ -25,7 +25,7 @@ fn main() {
         x: Some(deckmint::Coord::Inches(9.0)),
         y: Some(deckmint::Coord::Inches(5.2)),
         font_size: Some(10.0),
-        color: Some("999999".to_string()),
+        color: Some("#999999".to_string()),
         ..Default::default()
     });
 
@@ -36,7 +36,7 @@ fn main() {
     s.add_text(
         "Slide 2 — Content Section",
         TextOptionsBuilder::new()
-            .pos(0.5, 2.0).size(9.0, 1.5)
+            .bounds(0.5, 2.0, 9.0, 1.5)
             .font_size(32.0).align(AlignH::Center)
             .build(),
     );
@@ -46,7 +46,7 @@ fn main() {
     s.add_text(
         "Slide 3 — Also in Content",
         TextOptionsBuilder::new()
-            .pos(0.5, 2.0).size(9.0, 1.5)
+            .bounds(0.5, 2.0, 9.0, 1.5)
             .font_size(32.0).align(AlignH::Center)
             .build(),
     );
@@ -56,9 +56,9 @@ fn main() {
     s.add_text(
         "Hidden Backup Slide",
         TextOptionsBuilder::new()
-            .pos(0.5, 2.0).size(9.0, 1.5)
+            .bounds(0.5, 2.0, 9.0, 1.5)
             .font_size(28.0).align(AlignH::Center)
-            .color("999999")
+            .color("#999999")
             .build(),
     );
     s.hide();

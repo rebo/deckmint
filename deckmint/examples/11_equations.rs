@@ -15,7 +15,7 @@ fn main() {
     s.add_text(
         "LaTeX Equations",
         TextOptionsBuilder::new()
-            .pos(0.5, 0.3).size(9.0, 0.8)
+            .bounds(0.5, 0.3, 9.0, 0.8)
             .font_size(28.0).bold()
             .build(),
     );
@@ -24,7 +24,7 @@ fn main() {
     s.add_equation(
         r"x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}",
         TextOptionsBuilder::new()
-            .pos(1.0, 1.5).size(8.0, 1.2)
+            .bounds(1.0, 1.5, 8.0, 1.2)
             .font_size(24.0)
             .align(AlignH::Center)
             .build(),
@@ -34,7 +34,7 @@ fn main() {
     s.add_equation(
         r"e^{i\pi} + 1 = 0",
         TextOptionsBuilder::new()
-            .pos(1.0, 3.0).size(8.0, 1.0)
+            .bounds(1.0, 3.0, 8.0, 1.0)
             .font_size(28.0)
             .align(AlignH::Center)
             .build(),
@@ -44,7 +44,7 @@ fn main() {
     s.add_equation(
         r"\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}",
         TextOptionsBuilder::new()
-            .pos(1.0, 4.2).size(8.0, 1.2)
+            .bounds(1.0, 4.2, 8.0, 1.2)
             .font_size(24.0)
             .align(AlignH::Center)
             .build(),
@@ -56,7 +56,7 @@ fn main() {
     s.add_text(
         "Inline Equations",
         TextOptionsBuilder::new()
-            .pos(0.5, 0.3).size(9.0, 0.8)
+            .bounds(0.5, 0.3, 9.0, 0.8)
             .font_size(28.0).bold()
             .build(),
     );
@@ -64,7 +64,7 @@ fn main() {
     s.add_text_with_math(
         r"The area of a circle is $A = \pi r^2$ where $r$ is the radius.",
         TextOptionsBuilder::new()
-            .pos(0.5, 1.5).size(9.0, 1.0)
+            .bounds(0.5, 1.5, 9.0, 1.0)
             .font_size(18.0)
             .build(),
     ).unwrap();
@@ -72,7 +72,7 @@ fn main() {
     s.add_text_with_math(
         r"Einstein showed that $E = mc^2$, relating energy and mass.",
         TextOptionsBuilder::new()
-            .pos(0.5, 2.8).size(9.0, 1.0)
+            .bounds(0.5, 2.8, 9.0, 1.0)
             .font_size(18.0)
             .build(),
     ).unwrap();
@@ -80,7 +80,7 @@ fn main() {
     s.add_text_with_math(
         r"If $a = 5$ and $b = 3$, then $a^2 + b^2 = 34$.",
         TextOptionsBuilder::new()
-            .pos(0.5, 4.0).size(9.0, 1.0)
+            .bounds(0.5, 4.0, 9.0, 1.0)
             .font_size(18.0)
             .build(),
     ).unwrap();
@@ -91,7 +91,7 @@ fn main() {
     s.add_text(
         "Equation Runs via Builder",
         TextOptionsBuilder::new()
-            .pos(0.5, 0.3).size(9.0, 0.8)
+            .bounds(0.5, 0.3, 9.0, 0.8)
             .font_size(28.0).bold()
             .build(),
     );
@@ -104,7 +104,7 @@ fn main() {
             TextRunBuilder::new(" is a classic result.").font_size(18.0).build(),
         ],
         TextOptionsBuilder::new()
-            .pos(0.5, 1.5).size(9.0, 1.0)
+            .bounds(0.5, 1.5, 9.0, 1.0)
             .build(),
     );
 
@@ -112,7 +112,7 @@ fn main() {
     s.add_equation(
         r"A = \begin{pmatrix} 1 & 2 \\ 3 & 4 \end{pmatrix}",
         TextOptionsBuilder::new()
-            .pos(1.0, 3.0).size(8.0, 1.5)
+            .bounds(1.0, 3.0, 8.0, 1.5)
             .font_size(24.0)
             .align(AlignH::Center)
             .build(),

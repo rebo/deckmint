@@ -597,4 +597,19 @@ impl Slide {
         self.hidden = true;
         self
     }
+
+    /// Convert this slide into a [`SlideMasterDef`](crate::presentation::SlideMasterDef),
+    /// transferring all objects, media, and background settings.
+    pub fn into_master(self, title: impl Into<String>) -> crate::presentation::SlideMasterDef {
+        crate::presentation::SlideMasterDef {
+            title: title.into(),
+            background_color: self.background.as_ref().and_then(|b| b.color.clone()),
+            background_transparency: self.background.as_ref().and_then(|b| b.transparency),
+            background_image_rid: self.background.as_ref().and_then(|b| b.image_rid),
+            objects: self.objects,
+            rels: self.rels,
+            rels_media: self.rels_media,
+            obj_counter: self.obj_counter,
+        }
+    }
 }

@@ -67,6 +67,14 @@ impl MediaOptionsBuilder {
     pub fn pos(self, x: f64, y: f64) -> Self { self.x(x).y(y) }
     /// Set size (width, height) in inches.
     pub fn size(self, w: f64, h: f64) -> Self { self.w(w).h(h) }
+    /// Set position and size from a [`CellRect`](crate::layout::CellRect).
+    pub fn rect(self, r: crate::layout::CellRect) -> Self {
+        self.pos(r.x, r.y).size(r.w, r.h)
+    }
+    /// Set position (x, y) and size (w, h) in inches in a single call.
+    pub fn bounds(self, x: f64, y: f64, w: f64, h: f64) -> Self {
+        self.pos(x, y).size(w, h)
+    }
     /// Set the accessibility alt text.
     pub fn alt_text(mut self, t: impl Into<String>) -> Self { self.opts.alt_text = Some(t.into()); self }
 

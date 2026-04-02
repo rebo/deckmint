@@ -155,7 +155,13 @@ Target=\"../slideMasters/slideMaster1.xml\"/>\
 // ppt/slideMasters/_rels/slideMaster1.xml.rels
 // ─────────────────────────────────────────────────────────────
 
-pub fn make_xml_master_rel(layout_count: usize) -> String {
+pub fn make_xml_master_rel(
+    layout_count: usize,
+    rels: &[SlideRel],
+    rels_media: &[SlideRelMedia],
+    media_targets: &[String],
+    rid_offset: u32,
+) -> String {
     let mut s = String::new();
     s.push_str(&format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>{CRLF}\
@@ -174,6 +180,35 @@ Target=\"../slideLayouts/slideLayout{idx}.xml\"/>"
 Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" \
 Target=\"../theme/theme1.xml\"/>"
     ));
+    // Hyperlink rels
+    for rel in rels {
+        let actual_rid = rel.r_id + rid_offset;
+        if rel.rel_type.to_lowercase().contains("hyperlink") {
+            if rel.data.as_deref() == Some("slide") {
+                s.push_str(&format!(
+                    "<Relationship Id=\"rId{actual_rid}\" \
+Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" \
+Target=\"slide{}.xml\"/>", rel.target));
+            } else {
+                s.push_str(&format!(
+                    "<Relationship Id=\"rId{actual_rid}\" \
+Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" \
+Target=\"{}\" TargetMode=\"External\"/>", rel.target));
+            }
+        }
+    }
+    // Media rels (images, etc.)
+    for (i, rel) in rels_media.iter().enumerate() {
+        let actual_rid = rel.r_id + rid_offset;
+        let target = media_targets.get(i).map(String::as_str).unwrap_or(&rel.target);
+        let type_uri = match rel.rel_type.as_str() {
+            "video" => "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video",
+            "audio" => "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio",
+            _ => "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+        };
+        s.push_str(&format!(
+            "<Relationship Id=\"rId{actual_rid}\" Type=\"{type_uri}\" Target=\"{target}\"/>"));
+    }
     s.push_str("</Relationships>");
     s
 }

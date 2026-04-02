@@ -396,6 +396,14 @@ impl TextOptionsBuilder {
     pub fn size(self, w: f64, h: f64) -> Self {
         self.w(w).h(h)
     }
+    /// Set position and size from a [`CellRect`](crate::layout::CellRect).
+    pub fn rect(self, r: crate::layout::CellRect) -> Self {
+        self.pos(r.x, r.y).size(r.w, r.h)
+    }
+    /// Set position (x, y) and size (w, h) in inches in a single call.
+    pub fn bounds(self, x: f64, y: f64, w: f64, h: f64) -> Self {
+        self.pos(x, y).size(w, h)
+    }
     /// Set the X position as a percentage of slide width.
     pub fn x_pct(mut self, v: f64) -> Self { self.opts.position.x = Some(Coord::Percent(v)); self }
     /// Set the Y position as a percentage of slide height.
@@ -408,8 +416,8 @@ impl TextOptionsBuilder {
     pub fn font_size(mut self, pt: f64) -> Self { self.opts.font_size = Some(pt); self }
     /// Set the default font face name, e.g. "Arial".
     pub fn font_face(mut self, f: impl Into<String>) -> Self { self.opts.font_face = Some(f.into()); self }
-    /// Set the default font color as 6-digit hex, no `#` prefix.
-    pub fn color(mut self, c: impl Into<String>) -> Self { self.opts.color = Some(c.into()); self }
+    /// Set the default font color as hex (e.g. `"#4472C4"` or `"4472C4"`).
+    pub fn color(mut self, c: impl Into<String>) -> Self { self.opts.color = Some(c.into().trim_start_matches('#').to_uppercase()); self }
     /// Enable bold formatting as the default for all runs.
     pub fn bold(mut self) -> Self { self.opts.bold = Some(true); self }
     /// Enable italic formatting as the default for all runs.
@@ -420,8 +428,8 @@ impl TextOptionsBuilder {
     pub fn valign(mut self, a: AlignV) -> Self { self.opts.valign = Some(a); self }
     /// Enable right-to-left text direction.
     pub fn rtl(mut self) -> Self { self.opts.rtl_mode = true; self }
-    /// Set the solid background fill color as 6-digit hex, no `#` prefix.
-    pub fn fill(mut self, c: impl Into<String>) -> Self { self.opts.fill = Some(c.into()); self }
+    /// Set the solid background fill color as hex (e.g. `"#4472C4"` or `"4472C4"`).
+    pub fn fill(mut self, c: impl Into<String>) -> Self { self.opts.fill = Some(c.into().trim_start_matches('#').to_uppercase()); self }
     /// Set a gradient background fill for the text box.
     pub fn gradient_fill(mut self, g: GradientFill) -> Self { self.opts.gradient_fill = Some(g); self }
     /// Set the internal margin (inset) of the text box.

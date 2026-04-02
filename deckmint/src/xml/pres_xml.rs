@@ -36,9 +36,14 @@ pub fn make_xml_content_types(pres: &Presentation) -> String {
         ("wav",  "audio/wav"),
         ("m4a",  "audio/mp4"),
     ];
-    let used_extns: std::collections::HashSet<&str> = pres.slides.iter()
+    let mut used_extns: std::collections::HashSet<&str> = pres.slides.iter()
         .flat_map(|sl| sl.rels_media.iter().map(|m| m.extn.as_str()))
         .collect();
+    if let Some(ref m) = pres.master {
+        for media in &m.rels_media {
+            used_extns.insert(&media.extn);
+        }
+    }
     for (ext, mime) in mime_map {
         if used_extns.contains(ext) {
             s.push_str(&format!("<Default Extension=\"{ext}\" ContentType=\"{mime}\"/>"));
@@ -252,10 +257,12 @@ saveSubsetFonts=\"1\" autoCompressPictures=\"0\">"
         "<p:notesMasterIdLst><p:notesMasterId r:id=\"rId{}\"/></p:notesMasterIdLst>",
         pres.slides.len() + 2
     ));
-    // Slides
+    // Slides — rIds are index-based (rId2 = slide 1, rId3 = slide 2, etc.)
+    // to stay in sync with presentation.xml.rels regardless of slide removal.
     s.push_str("<p:sldIdLst>");
-    for slide in &pres.slides {
-        s.push_str(&format!("<p:sldId id=\"{}\" r:id=\"rId{}\"/>", slide.slide_id, slide.r_id));
+    for (idx, slide) in pres.slides.iter().enumerate() {
+        let r_id = idx + 2; // rId1 = master, slides start at rId2
+        s.push_str(&format!("<p:sldId id=\"{}\" r:id=\"rId{}\"/>", slide.slide_id, r_id));
     }
     s.push_str("</p:sldIdLst>");
     // Layout size
@@ -445,11 +452,31 @@ pub fn make_xml_theme(head_font_face: Option<&str>, body_font_face: Option<&str>
 // ppt/slideMasters/slideMaster1.xml
 // ─────────────────────────────────────────────────────────────
 
+/// Offset all image/media rIds in a vec of objects so they don't collide
+/// with layout and theme rIds in the master rels file.
+fn remap_object_rids(objects: &mut [crate::objects::SlideObject], offset: u32) {
+    use crate::objects::SlideObject;
+    for obj in objects.iter_mut() {
+        match obj {
+            SlideObject::Image(img) => { img.image_rid += offset; }
+            SlideObject::Media(m) => {
+                m.media_rid += offset;
+                if let Some(ref mut pr) = m.poster_rid { *pr += offset; }
+            }
+            SlideObject::Group(g) => { remap_object_rids(&mut g.children, offset); }
+            _ => {}
+        }
+    }
+}
+
 pub fn make_xml_master(pres: &Presentation) -> String {
     let layout_defs: String = pres.slide_layouts.iter().enumerate().map(|(idx, _layout)| {
         let id = crate::enums::LAYOUT_IDX_SERIES_BASE + idx as u64;
         format!("<p:sldLayoutId id=\"{id}\" r:id=\"rId{}\"/>", idx + 1)
     }).collect();
+
+    // Master rId offset: layout rIds (1..N) + theme rId (N+1), so user content starts at N+2
+    let rid_offset = (pres.slide_layouts.len() + 1) as u32;
 
     let mut s = String::new();
     s.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n");
@@ -462,9 +489,17 @@ xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">");
     let master_name = pres.master.as_ref().map(|m| m.title.as_str()).unwrap_or("DEFAULT");
     s.push_str(&format!("<p:cSld name=\"{master_name}\">"));
     if let Some(ref m) = pres.master {
-        if let Some(ref bg_color) = m.background_color {
+        if let Some(ref bg_image_rid) = m.background_image_rid {
+            let actual_rid = bg_image_rid + rid_offset;
+            s.push_str(&format!("<p:bg><p:bgPr><a:blipFill><a:blip r:embed=\"rId{actual_rid}\"/><a:stretch><a:fillRect/></a:stretch></a:blipFill><a:effectLst/></p:bgPr></p:bg>"));
+        } else if let Some(ref bg_color) = m.background_color {
             let c = bg_color.trim_start_matches('#').to_uppercase();
-            s.push_str(&format!("<p:bg><p:bgPr><a:solidFill><a:srgbClr val=\"{c}\"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>"));
+            if let Some(transparency) = m.background_transparency {
+                let alpha = ((100.0 - transparency) * 1000.0) as u32;
+                s.push_str(&format!("<p:bg><p:bgPr><a:solidFill><a:srgbClr val=\"{c}\"><a:alpha val=\"{alpha}\"/></a:srgbClr></a:solidFill><a:effectLst/></p:bgPr></p:bg>"));
+            } else {
+                s.push_str(&format!("<p:bg><p:bgPr><a:solidFill><a:srgbClr val=\"{c}\"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>"));
+            }
         } else {
             s.push_str("<p:bg><p:bgRef idx=\"1001\"><a:schemeClr val=\"bg1\"/></p:bgRef></p:bg>");
         }
@@ -475,10 +510,12 @@ xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">");
     s.push_str("<p:spTree><p:nvGrpSpPr><p:cNvPr id=\"1\" name=\"\"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>");
     s.push_str("<p:grpSpPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/><a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"0\" cy=\"0\"/></a:xfrm></p:grpSpPr>");
 
-    // Render master objects
+    // Render master objects (remap rIds for images/media)
     if let Some(ref m) = pres.master {
         if !m.objects.is_empty() {
-            s.push_str(&crate::xml::slide_xml::gen_xml_objects(&m.objects, pres));
+            let mut objects = m.objects.clone();
+            remap_object_rids(&mut objects, rid_offset);
+            s.push_str(&crate::xml::slide_xml::gen_xml_objects(&objects, pres));
         }
     }
 

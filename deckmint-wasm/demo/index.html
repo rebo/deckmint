@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>deckmint WASM Demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 60px auto; padding: 0 20px; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    #status { margin-top: 16px; color: #555; }
+    .error { color: #c00; }
+    .ok { color: #060; }
+  </style>
+</head>
+<body>
+  <h1>deckmint WASM Demo</h1>
+  <p>Generates a 3-slide PowerPoint in-browser using Rust compiled to WebAssembly.</p>
+  <button id="btn">Generate &amp; Download sample.pptx</button>
+  <div id="status">Initialising WASM…</div>
+
+  <script type="module">
+    import init, { JsPresentation } from '../pkg/deckmint_wasm.js';
+
+    let ready = false;
+
+    init().then(() => {
+      ready = true;
+      document.getElementById('status').textContent = 'WASM ready — click the button.';
+    }).catch(e => {
+      document.getElementById('status').innerHTML =
+        `<span class="error">Failed to load WASM: ${e}</span>`;
+    });
+
+    document.getElementById('btn').addEventListener('click', () => {
+      if (!ready) return;
+      const status = document.getElementById('status');
+      try {
+        const pres = new JsPresentation();
+        pres.set_title('deckmint Demo');
+        pres.set_author('WASM Demo');
+
+        // Slide 1: title text
+        const s1 = pres.add_slide();
+        pres.add_text(s1, 'deckmint', JSON.stringify({
+          x: 0.5, y: 0.5, w: 9.0, h: 1.5,
+          fontSize: 48, bold: true, align: 'center', color: '4472C4'
+        }));
+        pres.add_text(s1, 'Rust → WASM → PowerPoint', JSON.stringify({
+          x: 0.5, y: 2.5, w: 9.0, h: 1.0,
+          fontSize: 24, align: 'center'
+        }));
+        pres.add_shape(s1, 'rect', JSON.stringify({
+          x: 0.5, y: 4.0, w: 9.0, h: 0.1, fill: '4472C4'
+        }));
+
+        // Slide 2: table
+        const s2 = pres.add_slide();
+        pres.add_text(s2, 'Data Table', JSON.stringify({
+          x: 0.5, y: 0.3, w: 9.0, h: 0.8, fontSize: 28, bold: true
+        }));
+        const rows = [
+          [{ text: 'Name' }, { text: 'Role' }, { text: 'Score' }],
+          [{ text: 'Alice' }, { text: 'Engineer' }, { text: '98' }],
+          [{ text: 'Bob' }, { text: 'Designer' }, { text: '87' }],
+        ];
+        pres.add_table(s2, JSON.stringify(rows), JSON.stringify({
+          x: 0.5, y: 1.5, w: 9.0, h: 2.5, col_w: [3.0, 3.0, 3.0]
+        }));
+
+        // Slide 3: dark background
+        const s3 = pres.add_slide();
+        pres.set_background_color(s3, '1F3864');
+        pres.add_text(s3, 'Generated with Rust ⚙️', JSON.stringify({
+          x: 0.5, y: 2.0, w: 9.0, h: 1.5,
+          fontSize: 36, bold: true, align: 'center', color: 'FFFFFF'
+        }));
+
+        const bytes = pres.write();
+
+        // Trigger download
+        const blob = new Blob([bytes], {
+          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'sample.pptx';
+        a.click();
+        URL.revokeObjectURL(url);
+
+        status.innerHTML = `<span class="ok">✓ Downloaded sample.pptx (${bytes.length.toLocaleString()} bytes)</span>`;
+      } catch (e) {
+        status.innerHTML = `<span class="error">Error: ${e}</span>`;
+        console.error(e);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+[package]
+name = "deckmint-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "WASM bindings for deckmint"
+license = "MIT"
+repository = "https://github.com/rebo/deckmint"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+deckmint = { path = "../deckmint" }
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde-wasm-bindgen = "0.6"
+console_error_panic_hook = "0.1"
+wasm-bindgen-futures = "0.4"

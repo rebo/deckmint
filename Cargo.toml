@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "deckmint",
+    "deckmint-math",
+    "deckmint-wasm",
+]
+resolver = "2"

@@ -106,9 +106,11 @@ for (col, (label, color)) in [("Users", "#4472C4"), ("Revenue", "#70AD47"), ("Gr
 deckmint compiles to WASM via the `deckmint-wasm` crate, enabling PowerPoint generation directly in the browser with no server round-trip. See [`deckmint-wasm/demo/`](deckmint-wasm/demo/) for a working example that generates and downloads a `.pptx` from a button click.
 
 ```bash
-# Build the WASM package
+# Build the WASM package and run the demo
 cd deckmint-wasm
 wasm-pack build --target web
+python3 -m http.server 8080
+# Open http://localhost:8080/demo/
 ```
 
 ## Features

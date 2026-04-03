@@ -1,10 +1,11 @@
 [package]
 name = "deckmint"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "Create PowerPoint presentations programmatically in Rust"
 license = "MIT"
 repository = "https://github.com/rebo/deckmint"
+readme = "../README.md"
 keywords = ["powerpoint", "pptx", "presentation", "office", "ooxml"]
 categories = ["encoding", "parser-implementations"]
 
@@ -13,7 +14,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 uuid = { version = "1", features = ["v4", "js"] }
 base64 = "0.22"
 imagesize = "0.13"
-deckmint-math = { version = "0.1.1", path = "../deckmint-math", optional = true }
+deckmint-math = { version = "0.1.2", path = "../deckmint-math", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }

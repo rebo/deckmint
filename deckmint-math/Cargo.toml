@@ -1,10 +1,11 @@
 [package]
 name = "deckmint-math"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "LaTeX/MathML to PowerPoint OMML equation converter"
 license = "MIT"
 repository = "https://github.com/rebo/deckmint"
+readme = "README.md"
 
 [dependencies]
 latex2mathml = "0.2"

@@ -1390,7 +1390,10 @@ fn gen_xml_shadow(shadow: &crate::types::ShadowProps) -> String {
     let blur = val_to_pts(shadow.blur.unwrap_or(8.0));
     let offset = val_to_pts(shadow.offset.unwrap_or(4.0));
     let angle = (shadow.angle.unwrap_or(270.0) * 60_000.0).round() as i64;
-    let opacity = ((shadow.opacity.unwrap_or(0.75)) * 100_000.0).round() as i64;
+    let raw_opacity = shadow.opacity.unwrap_or(0.75);
+    // Normalise: if caller passed a percentage (e.g. 25.0 meaning 25%), convert to 0‑1.
+    let norm = if raw_opacity > 1.0 { raw_opacity / 100.0 } else { raw_opacity };
+    let opacity = (norm.clamp(0.0, 1.0) * 100_000.0).round() as i64;
     let color = shadow.color.as_deref().unwrap_or("000000");
 
     let type_tag = match shadow.shadow_type {

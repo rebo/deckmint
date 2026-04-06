@@ -157,7 +157,9 @@ pub fn gen_xml_grad_fill(grad: &crate::types::GradientFill) -> String {
 /// Create `<a:glow>` element for text glow effect
 pub fn create_glow_element(size: f64, color: &str, opacity: f64) -> String {
     let rad = val_to_pts(size);
-    let alpha = (opacity * 100_000.0).round() as i64;
+    // Normalise: if caller passed a percentage (e.g. 75.0 meaning 75%), convert to 0‑1.
+    let norm = if opacity > 1.0 { opacity / 100.0 } else { opacity };
+    let alpha = (norm.clamp(0.0, 1.0) * 100_000.0).round() as i64;
     let inner = format!("<a:alpha val=\"{alpha}\"/>");
     format!("<a:glow rad=\"{rad}\">{}</a:glow>", create_color_element(color, Some(&inner)))
 }

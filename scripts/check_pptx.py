@@ -782,6 +782,24 @@ def check_underline_values(zf, names):
     ok(f"Underline values: checked {checked} attribute(s) across {len(slide_paths)} slide(s)")
 
 
+def check_alpha_values(zf, names):
+    """
+    Validate that all <a:alpha val="N"/> values are in the valid OOXML range 0–100000.
+    Values > 100000 (e.g. from passing opacity as a percentage like 25.0 instead of 0.25)
+    cause PowerPoint to clamp them to 0 during repair.
+    """
+    xml_paths = sorted(n for n in names if n.endswith(".xml"))
+    checked = 0
+    for path in xml_paths:
+        xml = zf.read(path).decode("utf-8", errors="replace")
+        for m in re.finditer(r'<a:alpha\s+val="(\d+)"', xml):
+            val = int(m.group(1))
+            checked += 1
+            if val > 100000:
+                err(f"{path}: <a:alpha val=\"{val}\"/> exceeds OOXML maximum of 100000 — opacity likely passed as percentage instead of 0.0–1.0 fraction")
+    ok(f"Alpha values: checked {checked} attribute(s) across {len(xml_paths)} XML part(s)")
+
+
 def check_chart_xml(zf, chart_path):
     """Catch invalid chart XML patterns that trigger PowerPoint repair."""
     try:
@@ -948,6 +966,10 @@ def main():
 
     # Invalid underline style values
     check_underline_values(zf, names)
+    print()
+
+    # Alpha values out of OOXML range (0–100000)
+    check_alpha_values(zf, names)
     print()
 
     zf.close()

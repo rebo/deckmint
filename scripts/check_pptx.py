@@ -204,6 +204,19 @@ def check_animation_xml(zf, xml_path):
         issues.append("<p:by><a:hslClr> — use <p:hsl h=… s=… l=…/> (p: namespace) for HSL adjustments "
                       "in animClr; a:hslClr is an absolute DrawingML color, not a relative delta")
 
+    # 5b. <p:seq prevAc=…>: ST_TLPreviousActionType allows only "none" or
+    # "skipTimed". "seek" is NOT a valid value (that's nextAc's enum). Setting
+    # prevAc="seek" (an early attempt to enable left-arrow rewind) caused
+    # PowerPoint to repair the file and strip the attribute.
+    for m in re.finditer(r'<p:seq\b([^>]*)>', xml):
+        attrs = m.group(1)
+        prev = re.search(r'\bprevAc="([^"]*)"', attrs)
+        if prev and prev.group(1) not in ("none", "skipTimed"):
+            issues.append(f'<p:seq prevAc="{prev.group(1)}"> — invalid value; '
+                          'ST_TLPreviousActionType allows only "none" or "skipTimed". '
+                          'For left-arrow animation rewind, chain effects under one '
+                          '<p:par> with shared grpId rather than setting prevAc.')
+
     # 6. <p:bldP> animBg rules (uses the parsed tree for correct nesting):
     #    - Whole-shape / whole-paragraph animations: must have animBg="1"
     #    - Sub-target animations (charRg / pRg): must NOT have animBg="1"; use uiExpand="1"

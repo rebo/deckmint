@@ -1541,61 +1541,122 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
 
     use crate::types::AnimationTrigger;
 
-    // ── Group animations by trigger type ─────────────────────────────────────
-    // Each "trigger group" becomes one outer <p:par> in the mainSeq.
-    //  - OnClick (no click_group): singleton group, outer delay="indefinite"
-    //  - OnClick (with click_group): merged by key, outer delay="indefinite"
-    //  - WithPrevious: always a new group, outer delay="0" (or delay_ms)
-    //  - AfterPrevious: always a new group, outer delay="0" (or delay_ms)
+    // ── Group animations into click-steps ────────────────────────────────────
+    //
+    // Each "click step" maps to ONE outer <p:par> in mainSeq. PowerPoint can
+    // step forward/backward through these — left-arrow rewinds within a step.
+    //
+    //  - OnClick (no click_group)  : starts a fresh click step
+    //  - OnClick (with click_group): merges into the existing step for that key
+    //                                 (multiple effects fire on one click)
+    //  - WithPrevious              : joins the previous step (fires together
+    //                                 with the prior effect, +delay_ms)
+    //  - AfterPrevious             : joins the previous step (fires after the
+    //                                 prior effect's duration, +delay_ms)
+    //  - WithPrevious/AfterPrevious as the FIRST animation: starts an "auto"
+    //    step that fires on slide enter rather than on a click
+    //
+    // Within a step every effect shares the same grpId; cumulative delays
+    // are applied per-effect so a single user click triggers a timed cascade.
     #[derive(Clone, Copy, PartialEq)]
-    enum TriggerKind { Click, With, After }
+    enum StepKind { Click, Auto }
 
-    struct AnimGroup<'a> {
-        trigger: TriggerKind,
-        delay_ms: u32,
-        items: Vec<(usize, &'a AnimationEffect)>,
+    #[derive(Clone, Copy, PartialEq)]
+    enum ItemKind { Click, With, After }
+
+    struct StepItem<'a> {
+        spid: usize,
+        anim: &'a AnimationEffect,
+        item_kind: ItemKind,
+        cumulative_delay_ms: u32, // ms from step start to this effect's start
     }
 
-    let mut groups: Vec<AnimGroup<'_>> = Vec::new();
+    struct Step<'a> {
+        kind: StepKind,
+        leader_delay_ms: u32, // delay applied to the step's start cond
+        items: Vec<StepItem<'a>>,
+    }
+
+    // Default duration used for AfterPrevious cascading. Matches the dur="500"
+    // emitted by build_effect_xml for entrance/exit effects. Users who need
+    // tighter control can pass an explicit .delay() on the next animation.
+    const DEFAULT_EFFECT_DUR_MS: u32 = 500;
+
+    let mut steps: Vec<Step<'_>> = Vec::new();
     let mut click_key_to_idx: Vec<(u32, usize)> = Vec::new();
 
     for (spid, anim) in &anims {
         match &anim.trigger {
             AnimationTrigger::OnClick => {
                 match anim.click_group {
-                    None => groups.push(AnimGroup {
-                        trigger: TriggerKind::Click,
-                        delay_ms: anim.delay_ms.unwrap_or(0),
-                        items: vec![(*spid, *anim)],
+                    None => steps.push(Step {
+                        kind: StepKind::Click,
+                        leader_delay_ms: anim.delay_ms.unwrap_or(0),
+                        items: vec![StepItem {
+                            spid: *spid,
+                            anim: *anim,
+                            item_kind: ItemKind::Click,
+                            cumulative_delay_ms: 0,
+                        }],
                     }),
                     Some(key) => {
                         if let Some(&(_, gi)) = click_key_to_idx.iter().find(|(k, _)| *k == key) {
-                            groups[gi].items.push((*spid, *anim));
+                            steps[gi].items.push(StepItem {
+                                spid: *spid,
+                                anim: *anim,
+                                item_kind: ItemKind::With,
+                                cumulative_delay_ms: anim.delay_ms.unwrap_or(0),
+                            });
                         } else {
-                            let gi = groups.len();
+                            let gi = steps.len();
                             click_key_to_idx.push((key, gi));
-                            groups.push(AnimGroup {
-                                trigger: TriggerKind::Click,
-                                delay_ms: 0,
-                                items: vec![(*spid, *anim)],
+                            steps.push(Step {
+                                kind: StepKind::Click,
+                                leader_delay_ms: 0,
+                                items: vec![StepItem {
+                                    spid: *spid,
+                                    anim: *anim,
+                                    item_kind: ItemKind::Click,
+                                    cumulative_delay_ms: 0,
+                                }],
                             });
                         }
                     }
                 }
             }
-            AnimationTrigger::WithPrevious => {
-                groups.push(AnimGroup {
-                    trigger: TriggerKind::With,
-                    delay_ms: anim.delay_ms.unwrap_or(0),
-                    items: vec![(*spid, *anim)],
-                });
-            }
-            AnimationTrigger::AfterPrevious => {
-                groups.push(AnimGroup {
-                    trigger: TriggerKind::After,
-                    delay_ms: anim.delay_ms.unwrap_or(0),
-                    items: vec![(*spid, *anim)],
-                });
+            AnimationTrigger::WithPrevious | AnimationTrigger::AfterPrevious => {
+                let item_kind = if matches!(anim.trigger, AnimationTrigger::WithPrevious) {
+                    ItemKind::With
+                } else {
+                    ItemKind::After
+                };
+                let user_delay = anim.delay_ms.unwrap_or(0);
+                if let Some(last) = steps.last_mut() {
+                    let prev = last.items.last().unwrap();
+                    let cumulative = match item_kind {
+                        ItemKind::With  => prev.cumulative_delay_ms + user_delay,
+                        ItemKind::After => prev.cumulative_delay_ms + DEFAULT_EFFECT_DUR_MS + user_delay,
+                        ItemKind::Click => unreachable!(),
+                    };
+                    last.items.push(StepItem {
+                        spid: *spid,
+                        anim: *anim,
+                        item_kind,
+                        cumulative_delay_ms: cumulative,
+                    });
+                } else {
+                    // First animation has no preceding step — auto-fire on slide enter.
+                    steps.push(Step {
+                        kind: StepKind::Auto,
+                        leader_delay_ms: user_delay,
+                        items: vec![StepItem {
+                            spid: *spid,
+                            anim: *anim,
+                            item_kind,
+                            cumulative_delay_ms: 0,
+                        }],
+                    });
+                }
             }
         }
     }
@@ -1606,34 +1667,41 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
     s.push_str("<p:seq concurrent=\"1\" nextAc=\"seek\">");
     s.push_str("<p:cTn id=\"2\" dur=\"indefinite\" nodeType=\"mainSeq\"><p:childTnLst>");
 
-    let mut bld_entries: Vec<(usize, usize, &'static str, bool)> = Vec::new(); // (spid, grpId, presetClass, has_sub_target)
+    // bldLst entries — one per (spid, grpId). The same shape can appear in
+    // multiple steps (e.g. entrance then exit), each with its own grpId.
+    let mut bld_entries: Vec<(usize, usize, bool)> = Vec::new(); // (spid, grpId, has_sub_target)
     let mut ctn_id: usize = 3; // running unique cTn id counter (1=tmRoot, 2=mainSeq reserved)
 
-    for (grp_idx, group) in groups.iter().enumerate() {
-        let id_outer  = ctn_id; ctn_id += 1;
-        let id_middle = ctn_id; ctn_id += 1;
+    for (grp_idx, step) in steps.iter().enumerate() {
+        let id_outer = ctn_id;
+        ctn_id += 1;
 
-        // Outer par delay: OnClick waits for a click; With/After start automatically.
-        let outer_delay = match group.trigger {
-            TriggerKind::Click => "indefinite".to_string(),
-            _ => group.delay_ms.to_string(),
+        // Step-level start condition.
+        //  - Click: waits for the user to click (delay="indefinite").
+        //  - Auto:  fires on slide enter (delay = leader delay in ms).
+        // Multi-effect steps additionally include an onBegin cond pointing at
+        // the mainSeq (cTn id=2). PowerPoint emits this combination for any
+        // chained timed-cascade — including when the cascade is what enables
+        // left-arrow rewind across the whole step.
+        let primary_delay = match step.kind {
+            StepKind::Click => "indefinite".to_string(),
+            StepKind::Auto  => step.leader_delay_ms.to_string(),
         };
-
-        // For OnClick with delay_ms, the delay goes on the inner (middle) par.
-        let middle_delay = match group.trigger {
-            TriggerKind::Click => group.delay_ms.to_string(),
-            _ => "0".to_string(),
+        let begin_cond = if step.items.len() > 1 {
+            "<p:cond evt=\"onBegin\" delay=\"0\"><p:tn val=\"2\"/></p:cond>"
+        } else {
+            ""
         };
 
         s.push_str(&format!(
             "<p:par><p:cTn id=\"{id_outer}\" fill=\"hold\">\
-<p:stCondLst><p:cond delay=\"{outer_delay}\"/></p:stCondLst>\
-<p:childTnLst><p:par><p:cTn id=\"{id_middle}\" fill=\"hold\">\
-<p:stCondLst><p:cond delay=\"{middle_delay}\"/></p:stCondLst>\
+<p:stCondLst><p:cond delay=\"{primary_delay}\"/>{begin_cond}</p:stCondLst>\
 <p:childTnLst>"
         ));
 
-        for (j, (spid, anim)) in group.items.iter().enumerate() {
+        for (j, item) in step.items.iter().enumerate() {
+            let StepItem { spid, anim, item_kind, cumulative_delay_ms } = item;
+            let id_middle = ctn_id; ctn_id += 1;
             let id_effect = ctn_id; ctn_id += 1;
             let id_set    = ctn_id; ctn_id += 1;
             let id_fx     = ctn_id; ctn_id += 1;
@@ -1658,11 +1726,23 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
                 inner_xml = inner_xml.replace(&bare, &with_tx);
             }
 
-            // Determine nodeType based on trigger and position within group
-            let node_type = match group.trigger {
-                TriggerKind::Click => if j == 0 { "clickEffect" } else { "withEffect" },
-                TriggerKind::With  => "withEffect",
-                TriggerKind::After => "afterEffect",
+            // nodeType: leader (j==0) reflects how the step starts, items 1+
+            // reflect how they chain off the previous effect.
+            let node_type = if j == 0 {
+                match step.kind {
+                    StepKind::Click => "clickEffect",
+                    StepKind::Auto  => match item_kind {
+                        ItemKind::With  => "withEffect",
+                        ItemKind::After => "afterEffect",
+                        ItemKind::Click => "clickEffect", // unreachable in Auto
+                    },
+                }
+            } else {
+                match item_kind {
+                    ItemKind::With  => "withEffect",
+                    ItemKind::After => "afterEffect",
+                    ItemKind::Click => "withEffect", // OnClick joining a click_group
+                }
             };
 
             let preset_id = fx.preset_id;
@@ -1670,25 +1750,30 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
             let preset_subtype = fx.preset_subtype;
             let iterate_xml = fx.iterate.as_deref().unwrap_or("");
 
-            // animBg="1" applies when the whole paragraph/shape is built; omit it for
-            // character-range / paragraph-range sub-targets (charRg / pRg) because the
-            // OOXML spec states animBg must NOT be set when animating selected characters.
             let has_sub_target = anim.text_target.is_some();
-            bld_entries.push((*spid, grp_idx, preset_class, has_sub_target));
+            bld_entries.push((*spid, grp_idx, has_sub_target));
 
+            // Each effect lives in its own middle <p:par> wrapper carrying the
+            // cumulative delay from step start. This matches PowerPoint's own
+            // emission for timed cascades (see timing.pptx) and is what makes
+            // the whole step a single seekable unit for left-arrow rewind.
             s.push_str(&format!(
-                "<p:par>\
+                "<p:par><p:cTn id=\"{id_middle}\" fill=\"hold\">\
+<p:stCondLst><p:cond delay=\"{cumulative_delay_ms}\"/></p:stCondLst>\
+<p:childTnLst>\
+<p:par>\
 <p:cTn id=\"{id_effect}\" presetID=\"{preset_id}\" presetClass=\"{preset_class}\" \
 presetSubtype=\"{preset_subtype}\" fill=\"hold\" grpId=\"{grp_idx}\" nodeType=\"{node_type}\">\
 <p:stCondLst><p:cond delay=\"0\"/></p:stCondLst>\
 {iterate_xml}\
 <p:childTnLst>{inner_xml}</p:childTnLst></p:cTn>\
-</p:par>"
+</p:par>\
+</p:childTnLst></p:cTn></p:par>"
             ));
         }
 
-        // Close outer par
-        s.push_str("</p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par>");
+        // Close outer step par
+        s.push_str("</p:childTnLst></p:cTn></p:par>");
     }
 
     s.push_str("</p:childTnLst></p:cTn>");
@@ -1696,8 +1781,21 @@ presetSubtype=\"{preset_subtype}\" fill=\"hold\" grpId=\"{grp_idx}\" nodeType=\"
     s.push_str("<p:nextCondLst><p:cond evt=\"onNext\" delay=\"0\"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst>");
     s.push_str("</p:seq></p:childTnLst></p:cTn></p:par></p:tnLst>");
 
+    // Dedup on (spid, grpId): a step that fires multiple effects on the same
+    // shape (e.g. WithPrevious co-firing) only needs one bldP entry.
+    // If any effect for this (spid, grpId) targets a sub-range, prefer the
+    // sub-target form (uiExpand) over the whole-shape form (animBg).
+    let mut seen: Vec<(usize, usize, bool)> = Vec::new();
+    for (spid, grp_id, has_sub_target) in &bld_entries {
+        if let Some(existing) = seen.iter_mut().find(|(s, g, _)| s == spid && g == grp_id) {
+            existing.2 = existing.2 || *has_sub_target;
+        } else {
+            seen.push((*spid, *grp_id, *has_sub_target));
+        }
+    }
+
     s.push_str("<p:bldLst>");
-    for (spid, grp_id, _preset_class, has_sub_target) in &bld_entries {
+    for (spid, grp_id, has_sub_target) in &seen {
         // animBg="1" applies only for whole-shape/whole-paragraph animations.
         // Sub-target animations (charRg / pRg) must NOT have animBg set.
         if *has_sub_target {

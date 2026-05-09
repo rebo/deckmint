@@ -1545,6 +1545,106 @@ fn animation_wave_emits_preset24_emph() {
     assert!(xml.contains("style.rotation"), "rotation attr");
 }
 
+// ─── Trigger grouping (OnClick / WithPrevious / AfterPrevious) ──────────
+
+/// Helper: build a slide with three sequential text+animation triples and
+/// return slide1.xml. Caller chooses the trigger applied to objects 2 and 3.
+fn three_anims_xml(
+    second: AnimationEffect,
+    third: AnimationEffect,
+) -> String {
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    slide.add_text("a", TextOptionsBuilder::new().x(1.0).y(1.0).w(4.0).h(0.5)
+        .animation(AnimationEffect::fade_in()).build());
+    slide.add_text("b", TextOptionsBuilder::new().x(1.0).y(2.0).w(4.0).h(0.5)
+        .animation(second).build());
+    slide.add_text("c", TextOptionsBuilder::new().x(1.0).y(3.0).w(4.0).h(0.5)
+        .animation(third).build());
+    let bytes = pres.write().expect("write failed");
+    let mut zip = open_zip(&bytes);
+    read_entry(&mut zip, "ppt/slides/slide1.xml")
+}
+
+#[test]
+fn after_previous_chains_share_grpid_and_one_outer_par() {
+    let xml = three_anims_xml(
+        AnimationEffect::fade_in().after_previous().delay(500),
+        AnimationEffect::fade_in().after_previous().delay(500),
+    );
+    // All three effects share grpId=0
+    assert!(xml.contains(r#"grpId="0""#), "shared grpId for chained step");
+    assert!(!xml.contains(r#"grpId="1""#), "no second grpId — chained into one step");
+    // First effect is clickEffect, subsequent are afterEffect
+    assert!(xml.contains(r#"nodeType="clickEffect""#), "leader is clickEffect");
+    assert!(xml.contains(r#"nodeType="afterEffect""#), "chained items are afterEffect");
+    // Multi-effect chain emits the onBegin tn cond pointing at mainSeq
+    assert!(xml.contains(r#"<p:cond evt="onBegin" delay="0"><p:tn val="2"/></p:cond>"#),
+            "multi-effect step needs onBegin cond");
+    // bldList should have 3 bldP, all grpId=0
+    assert!(xml.contains(r#"<p:bldP spid="2" grpId="0" animBg="1"/>"#));
+    assert!(xml.contains(r#"<p:bldP spid="3" grpId="0" animBg="1"/>"#));
+    assert!(xml.contains(r#"<p:bldP spid="4" grpId="0" animBg="1"/>"#));
+}
+
+#[test]
+fn after_previous_emits_cumulative_delays() {
+    let xml = three_anims_xml(
+        AnimationEffect::fade_in().after_previous().delay(500),
+        AnimationEffect::fade_in().after_previous().delay(500),
+    );
+    // Effect 1: middle wrapper delay=0
+    // Effect 2: 500 (default dur) + 500 (user) = 1000
+    // Effect 3: 1000 + 500 + 500 = 2000
+    assert!(xml.contains(r#"<p:cond delay="1000"/>"#), "effect 2 cumulative delay");
+    assert!(xml.contains(r#"<p:cond delay="2000"/>"#), "effect 3 cumulative delay");
+}
+
+#[test]
+fn with_previous_chains_into_step_as_with_effect() {
+    let xml = three_anims_xml(
+        AnimationEffect::fade_in().with_previous(),
+        AnimationEffect::fade_in().with_previous(),
+    );
+    assert!(xml.contains(r#"grpId="0""#));
+    assert!(!xml.contains(r#"grpId="1""#));
+    assert!(xml.contains(r#"nodeType="withEffect""#),
+            "WithPrevious chained items are withEffect");
+}
+
+#[test]
+fn three_independent_clicks_create_three_steps() {
+    let xml = three_anims_xml(
+        AnimationEffect::fade_in(),
+        AnimationEffect::fade_in(),
+    );
+    // Three OnClick animations → three separate grpIds
+    assert!(xml.contains(r#"grpId="0""#));
+    assert!(xml.contains(r#"grpId="1""#));
+    assert!(xml.contains(r#"grpId="2""#));
+    // No onBegin cond for single-effect steps
+    assert!(!xml.contains(r#"<p:tn val="2"/>"#),
+            "single-effect steps don't need onBegin cond");
+}
+
+#[test]
+fn first_anim_after_previous_creates_auto_step() {
+    // First (and only) animation uses AfterPrevious — should auto-fire on slide
+    // enter rather than wait for a click, and emit nodeType=afterEffect.
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    slide.add_text("solo", TextOptionsBuilder::new().x(1.0).y(1.0).w(4.0).h(0.5)
+        .animation(AnimationEffect::fade_in().after_previous().delay(750)).build());
+    let bytes = pres.write().expect("write failed");
+    let mut zip = open_zip(&bytes);
+    let xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
+    // Outer par auto-starts (no "indefinite") — instead the leader_delay_ms goes there
+    assert!(xml.contains(r#"<p:cond delay="750"/>"#), "auto step uses leader_delay_ms");
+    assert!(!xml.contains(r#"delay="indefinite""#), "auto step does not wait for click");
+    assert!(xml.contains(r#"nodeType="afterEffect""#),
+            "auto-leader keeps its trigger nodeType");
+}
+
 // ─── Master slide ergonomics ─────────────────────────────
 
 #[test]

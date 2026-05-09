@@ -92,6 +92,7 @@ These have already been fixed and are checked by the linter:
 | `<p:zoom/>` for modern zoom transition | Use `<p14:prism/>` in `mc:AlternateContent` — Zoom/Vortex/etc. are p14 extended transitions requiring the `mc:Choice`/`mc:Fallback` pattern | (generator fix) |
 | Invalid underline `u=` values (`heavyDash`, `heavyDotted`, `heavyWavy`) | Use `dashHeavy`, `dottedHeavy`, `wavyHeavy` — OOXML ST_TextUnderlineType uses adjective-noun order | `check_underline_values` |
 | `<a:alpha val="N"/>` where N > 100000 (e.g. 2500000) | Normalise opacity: if > 1.0 divide by 100, then clamp to 0.0–1.0 before multiplying by 100000 | `check_alpha_values` |
+| `<p:seq prevAc="seek">` | Remove `prevAc` (or use `"skipTimed"`); ST_TLPreviousActionType only allows `none`/`skipTimed`. For left-arrow rewind across animations, chain effects under ONE outer `<p:par>` with shared `grpId` and emit `<p:cond evt="onBegin"><p:tn val="2"/></p:cond>` on the step | `check_animation_xml` |
 
 ---
 

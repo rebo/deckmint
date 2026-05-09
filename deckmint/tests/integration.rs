@@ -580,6 +580,8 @@ fn animation_appear_emits_timing_block() {
     assert!(xml.contains("presetClass=\"entr\""), "entrance preset class");
     assert!(xml.contains("style.visibility"), "visibility attribute");
     assert!(xml.contains("val=\"visible\""), "appear sets visible");
+    assert!(xml.contains(r#"prevAc="seek""#), "prevAc=seek required for left-arrow rewind");
+    assert!(xml.contains(r#"nextAc="seek""#), "nextAc=seek required for right-arrow step");
 }
 
 #[test]

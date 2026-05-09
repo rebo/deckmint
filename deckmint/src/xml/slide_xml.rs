@@ -1603,7 +1603,7 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
     let mut s = String::new();
     s.push_str("<p:timing><p:tnLst><p:par>");
     s.push_str("<p:cTn id=\"1\" dur=\"indefinite\" restart=\"never\" nodeType=\"tmRoot\"><p:childTnLst>");
-    s.push_str("<p:seq concurrent=\"1\" prevAc=\"seek\" nextAc=\"seek\">");
+    s.push_str("<p:seq concurrent=\"1\" nextAc=\"seek\">");
     s.push_str("<p:cTn id=\"2\" dur=\"indefinite\" nodeType=\"mainSeq\"><p:childTnLst>");
 
     let mut bld_entries: Vec<(usize, usize, &'static str, bool)> = Vec::new(); // (spid, grpId, presetClass, has_sub_target)

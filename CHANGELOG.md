@@ -4,6 +4,15 @@ All notable changes to deckmint, deckmint-math, and deckmint-wasm.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2026-05-09
+
+### Fixed
+- Auto-firing animation cascades (where the first effect uses `.after_previous()` or `.with_previous()`) are now rewindable by PowerPoint's left arrow. Previously the leader's `.delay(N)` pushed `delay="N"` onto the step's outer `<p:cond>`, which PowerPoint treats as a non-navigable timeline event. The outer cond is now always `delay="indefinite"` (PowerPoint's "rewindable step" marker), and Auto steps add an `<p:cond evt="onBegin"><p:tn val="2"/></p:cond>` cond to auto-fire on slide enter; the user's leader delay flows into the leader's middle wrapper instead.
+- A user-supplied `.delay(N)` on an `OnClick` leader was previously dropped (the outer cond was hardcoded to `indefinite`); it now lands on the leader's middle wrapper as intended.
+
+### Changed
+- `Step` no longer carries a separate `leader_delay_ms` field; the leader's delay is just `items[0].cumulative_delay_ms`.
+
 ## [0.1.6] - 2026-05-09
 
 ### Fixed
@@ -54,6 +63,7 @@ Buggy release: emitted `<p:seq prevAc="seek">` to try to enable left-arrow anima
 
 Initial release.
 
+[0.1.7]: https://github.com/rebo/deckmint/releases/tag/v0.1.7
 [0.1.6]: https://github.com/rebo/deckmint/releases/tag/v0.1.6
 [0.1.5]: https://github.com/rebo/deckmint/releases/tag/v0.1.5
 [0.1.4]: https://github.com/rebo/deckmint/releases/tag/v0.1.4

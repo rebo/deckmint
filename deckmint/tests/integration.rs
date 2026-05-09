@@ -1628,9 +1628,13 @@ fn three_independent_clicks_create_three_steps() {
 }
 
 #[test]
-fn first_anim_after_previous_creates_auto_step() {
-    // First (and only) animation uses AfterPrevious — should auto-fire on slide
-    // enter rather than wait for a click, and emit nodeType=afterEffect.
+fn first_anim_after_previous_creates_rewindable_auto_step() {
+    // A leading .after_previous() must produce a step that:
+    //   1. Auto-fires on slide enter (via onBegin cond pointing at mainSeq)
+    //   2. Is *rewindable* by left-arrow — which requires the outer cond to be
+    //      delay="indefinite" (not delay="N", since N marks a non-navigable
+    //      timeline event in PowerPoint's model).
+    // The leader's user-supplied .delay() goes onto its middle wrapper instead.
     let mut pres = Presentation::new();
     let slide = pres.add_slide();
     slide.add_text("solo", TextOptionsBuilder::new().x(1.0).y(1.0).w(4.0).h(0.5)
@@ -1638,9 +1642,16 @@ fn first_anim_after_previous_creates_auto_step() {
     let bytes = pres.write().expect("write failed");
     let mut zip = open_zip(&bytes);
     let xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
-    // Outer par auto-starts (no "indefinite") — instead the leader_delay_ms goes there
-    assert!(xml.contains(r#"<p:cond delay="750"/>"#), "auto step uses leader_delay_ms");
-    assert!(!xml.contains(r#"delay="indefinite""#), "auto step does not wait for click");
+    // Outer cond is indefinite (rewindable marker)
+    assert!(xml.contains(r#"<p:cond delay="indefinite"/>"#),
+            "auto step outer must be indefinite for left-arrow rewind");
+    // Plus an onBegin tn=2 cond to actually auto-fire it
+    assert!(xml.contains(r#"<p:cond evt="onBegin" delay="0"><p:tn val="2"/></p:cond>"#),
+            "auto step needs onBegin cond to fire without a click");
+    // The user's .delay(750) shows up on the leader's middle wrapper
+    assert!(xml.contains(r#"<p:cond delay="750"/>"#),
+            "leader_delay_ms moves to leader's middle wrapper");
+    // Leader keeps its trigger nodeType
     assert!(xml.contains(r#"nodeType="afterEffect""#),
             "auto-leader keeps its trigger nodeType");
 }

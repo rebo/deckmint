@@ -1573,7 +1573,6 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
 
     struct Step<'a> {
         kind: StepKind,
-        leader_delay_ms: u32, // delay applied to the step's start cond
         items: Vec<StepItem<'a>>,
     }
 
@@ -1591,12 +1590,11 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
                 match anim.click_group {
                     None => steps.push(Step {
                         kind: StepKind::Click,
-                        leader_delay_ms: anim.delay_ms.unwrap_or(0),
                         items: vec![StepItem {
                             spid: *spid,
                             anim: *anim,
                             item_kind: ItemKind::Click,
-                            cumulative_delay_ms: 0,
+                            cumulative_delay_ms: anim.delay_ms.unwrap_or(0),
                         }],
                     }),
                     Some(key) => {
@@ -1612,12 +1610,11 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
                             click_key_to_idx.push((key, gi));
                             steps.push(Step {
                                 kind: StepKind::Click,
-                                leader_delay_ms: 0,
                                 items: vec![StepItem {
                                     spid: *spid,
                                     anim: *anim,
                                     item_kind: ItemKind::Click,
-                                    cumulative_delay_ms: 0,
+                                    cumulative_delay_ms: anim.delay_ms.unwrap_or(0),
                                 }],
                             });
                         }
@@ -1645,15 +1642,18 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
                         cumulative_delay_ms: cumulative,
                     });
                 } else {
-                    // First animation has no preceding step — auto-fire on slide enter.
+                    // First animation has no preceding step — auto-fire on slide
+                    // enter. The leader's user-supplied delay goes onto its middle
+                    // wrapper (cumulative_delay_ms); the outer step cond stays
+                    // delay="indefinite" so PowerPoint treats the step as
+                    // rewindable, while an `onBegin tn="2"` cond auto-fires it.
                     steps.push(Step {
                         kind: StepKind::Auto,
-                        leader_delay_ms: user_delay,
                         items: vec![StepItem {
                             spid: *spid,
                             anim: *anim,
                             item_kind,
-                            cumulative_delay_ms: 0,
+                            cumulative_delay_ms: user_delay,
                         }],
                     });
                 }
@@ -1677,17 +1677,22 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
         ctn_id += 1;
 
         // Step-level start condition.
-        //  - Click: waits for the user to click (delay="indefinite").
-        //  - Auto:  fires on slide enter (delay = leader delay in ms).
-        // Multi-effect steps additionally include an onBegin cond pointing at
-        // the mainSeq (cTn id=2). PowerPoint emits this combination for any
-        // chained timed-cascade — including when the cascade is what enables
-        // left-arrow rewind across the whole step.
-        let primary_delay = match step.kind {
-            StepKind::Click => "indefinite".to_string(),
-            StepKind::Auto  => step.leader_delay_ms.to_string(),
-        };
-        let begin_cond = if step.items.len() > 1 {
+        //
+        // PowerPoint uses delay="indefinite" as the marker for "this step is a
+        // rewindable navigation unit". A non-indefinite delay turns it into an
+        // ordinary timeline event that left-arrow can't seek back across.
+        // We therefore ALWAYS emit delay="indefinite" and convey any per-step
+        // delays via the leader's cumulative_delay_ms instead.
+        //
+        // The onBegin cond pointing at mainSeq (cTn id=2) is what fires the
+        // step automatically:
+        //  - Auto steps: required (the cascade has no preceding click trigger).
+        //  - Multi-effect Click steps: emitted to match PowerPoint's hand-
+        //    authored behaviour for chained click cascades (timing.pptx).
+        //  - Single-effect Click steps: omitted, so the step truly waits for
+        //    a user click before firing.
+        let needs_begin_cond = step.kind == StepKind::Auto || step.items.len() > 1;
+        let begin_cond = if needs_begin_cond {
             "<p:cond evt=\"onBegin\" delay=\"0\"><p:tn val=\"2\"/></p:cond>"
         } else {
             ""
@@ -1695,7 +1700,7 @@ pub fn gen_xml_timing(objects: &[SlideObject]) -> String {
 
         s.push_str(&format!(
             "<p:par><p:cTn id=\"{id_outer}\" fill=\"hold\">\
-<p:stCondLst><p:cond delay=\"{primary_delay}\"/>{begin_cond}</p:stCondLst>\
+<p:stCondLst><p:cond delay=\"indefinite\"/>{begin_cond}</p:stCondLst>\
 <p:childTnLst>"
         ));
 

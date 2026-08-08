@@ -404,7 +404,14 @@ fn gen_xml_image_object(img: &ImageObject, obj_id: usize, pres: &Presentation) -
     // blipFill
     s.push_str("<p:blipFill>");
     if img.is_svg {
-        s.push_str(&format!("<a:blip r:embed=\"rId{}\">", rid - 1));
+        // PowerPoint requires the base <a:blip r:embed> to reference a real,
+        // independently-registered raster image — it's the fallback for hosts
+        // that don't understand the asvg:svgBlip extension, not a repeat of
+        // the SVG's own rId. `raster_fallback_rid` is always `Some` for an
+        // image built via `add_image_svg`; the `rid - 1` fallback here only
+        // guards a manually-constructed `ImageObject` that skipped it.
+        let fallback_rid = img.raster_fallback_rid.unwrap_or_else(|| rid.saturating_sub(1));
+        s.push_str(&format!("<a:blip r:embed=\"rId{fallback_rid}\">"));
         if let Some(t) = img.options.transparency {
             s.push_str(&format!("<a:alphaModFix amt=\"{}\"/>", ((100.0 - t) * 1000.0).round() as i64));
         }

@@ -467,14 +467,27 @@ def _resolve_target(xml_part_path, target):
 
 def check_relationship_integrity(zf, names):
     """
-    Check 1: Orphaned rId — every r:id used in slide XML must exist in the rels file.
+    Check 1: Orphaned rId — every r:id/r:embed/r:link used in a part's XML must
+              exist in that part's rels file.
     Check 2: Missing physical asset — every rels Target (internal) must exist in ZIP.
     Check 3: Duplicate rId values within a single rels file.
-    """
-    slide_names = sorted(n for n in names if re.match(r"ppt/slides/slide\d+\.xml$", n))
 
-    for slide_path in slide_names:
-        rels_path = slide_path.replace("slides/", "slides/_rels/") + ".rels"
+    Covers slides, slideLayouts, and slideMasters — a picture's base
+    `<a:blip r:embed>` dangling because its rId was never actually registered
+    (e.g. an SVG's raster fallback assumed to be "the previous rel" instead of
+    its own real relationship) is exactly as broken on a layout/master's
+    chrome as it is on a slide's content, so all three chrome tiers get the
+    same cross-reference check.
+    """
+    part_names = sorted(
+        n for n in names
+        if re.match(r"ppt/slides/slide\d+\.xml$", n)
+        or re.match(r"ppt/slideLayouts/slideLayout\d+\.xml$", n)
+        or re.match(r"ppt/slideMasters/slideMaster\d+\.xml$", n)
+    )
+
+    for part_path in part_names:
+        rels_path = part_path.rsplit("/", 1)[0] + "/_rels/" + part_path.rsplit("/", 1)[1] + ".rels"
         rels = _parse_rels(zf, rels_path)
 
         # Duplicate rIds
@@ -485,23 +498,23 @@ def check_relationship_integrity(zf, names):
                 err(f"{rels_path}: duplicate rId '{rid}'")
             seen.add(rid)
 
-        # Collect all rId references in slide XML
-        slide_xml = zf.read(slide_path).decode("utf-8")
-        used_rids = set(re.findall(r'r:id="(rId\d+)"', slide_xml))
+        # Collect all rId references in the part's XML
+        part_xml = zf.read(part_path).decode("utf-8")
+        used_rids = set(re.findall(r'r:id="(rId\d+)"', part_xml))
         # Also check embed= and link= attributes
-        used_rids |= set(re.findall(r'r:embed="(rId\d+)"', slide_xml))
-        used_rids |= set(re.findall(r'r:link="(rId\d+)"', slide_xml))
+        used_rids |= set(re.findall(r'r:embed="(rId\d+)"', part_xml))
+        used_rids |= set(re.findall(r'r:link="(rId\d+)"', part_xml))
 
         for rid in used_rids:
             if rid not in rels:
-                err(f"{slide_path}: uses {rid} which is not defined in {rels_path}")
+                err(f"{part_path}: uses {rid} which is not defined in {rels_path}")
 
         ok_count = 0
         for rid, (typ, target, mode) in rels.items():
             if mode == "External":
                 ok_count += 1
                 continue  # external hyperlinks don't need a physical file
-            resolved = _resolve_target(slide_path, target)
+            resolved = _resolve_target(part_path, target)
             if resolved not in names:
                 err(f"{rels_path}: {rid} → '{target}' resolved to '{resolved}' which does not exist in ZIP")
             else:

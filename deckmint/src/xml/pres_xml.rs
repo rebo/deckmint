@@ -463,7 +463,10 @@ fn remap_object_rids(objects: &mut [crate::objects::SlideObject], offset: u32) {
     use crate::objects::SlideObject;
     for obj in objects.iter_mut() {
         match obj {
-            SlideObject::Image(img) => { img.image_rid += offset; }
+            SlideObject::Image(img) => {
+                img.image_rid += offset;
+                if let Some(ref mut fallback_rid) = img.raster_fallback_rid { *fallback_rid += offset; }
+            }
             SlideObject::Media(m) => {
                 m.media_rid += offset;
                 if let Some(ref mut pr) = m.poster_rid { *pr += offset; }

@@ -1,4 +1,3 @@
-use imagesize;
 use crate::enums::ShapeType;
 use crate::error::PptxError;
 use crate::objects::{SlideObject, SlideRel, SlideRelMedia, TextObject, ShapeObject, ImageObject, ConnectorObject, ConnectorType, ConnectorOptions};
@@ -7,7 +6,7 @@ use crate::objects::shape::ShapeOptions;
 use crate::objects::image::{ImageOptions, ImageOptionsBuilder};
 use crate::packaging::assemble_pptx;
 use crate::slide::Slide;
-use crate::types::{Coord, PresLayout};
+use crate::types::PresLayout;
 
 /// A named slide layout — the anatomy tier between the master and a slide.
 ///
@@ -131,14 +130,7 @@ impl SlideLayout {
     /// Add an image from raw bytes.
     pub fn add_image(&mut self, data: Vec<u8>, extension: &str, mut opts: ImageOptions) -> &mut Self {
         let name = self.next_obj_name("Image");
-        if opts.position.w.is_none() || opts.position.h.is_none() {
-            if let Ok(dim) = imagesize::blob_size(&data) {
-                let emu_w = (dim.width as i64) * 914_400 / 96;
-                let emu_h = (dim.height as i64) * 914_400 / 96;
-                if opts.position.w.is_none() { opts.position.w = Some(Coord::Emu(emu_w)); }
-                if opts.position.h.is_none() { opts.position.h = Some(Coord::Emu(emu_h)); }
-            }
-        }
+        crate::objects::image::resolve_image_size(&data, &mut opts.position);
         if let Some(ref mut hl) = opts.hyperlink {
             self.register_hyperlink_rel(hl);
         }
@@ -152,16 +144,14 @@ impl SlideLayout {
         self.rels_media.push(SlideRelMedia {
             r_id: rid, rel_type: "image".to_string(), target, extn: extn.clone(), data: data.clone(),
         });
-        let obj = ImageObject { object_name: name, image_rid: rid, extension: extn, data, is_svg, options: opts };
+        let obj = ImageObject { object_name: name, image_rid: rid, extension: extn, data, is_svg, raster_fallback_rid: None, options: opts };
         self.objects.push(SlideObject::Image(obj));
         self
     }
 
     /// Add an image from a base64-encoded string.
     pub fn add_image_base64(&mut self, b64: &str, extension: &str, opts: ImageOptions) -> Result<&mut Self, PptxError> {
-        let raw = if let Some(idx) = b64.find(',') { &b64[idx + 1..] } else { b64 };
-        let data = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, raw)
-            .map_err(|e| PptxError::InvalidArgument(format!("base64 decode error: {e}")))?;
+        let data = crate::utils::decode_base64_image(b64)?;
         Ok(self.add_image(data, extension, opts))
     }
 
@@ -180,6 +170,80 @@ impl SlideLayout {
         }
         let extension = ext.unwrap_or_else(|| "png".to_string());
         Ok(self.add_image(data, &extension, opts))
+    }
+
+    /// Add an SVG image with a raster (PNG) fallback — mirrors
+    /// [`Slide::add_image_svg`](crate::slide::Slide::add_image_svg); see there
+    /// for why both media parts are required and independently registered.
+    pub fn add_image_svg(&mut self, svg_data: Vec<u8>, png_fallback_data: Vec<u8>, mut opts: ImageOptions) -> &mut Self {
+        let name = self.next_obj_name("Image");
+        crate::objects::image::resolve_image_size(&png_fallback_data, &mut opts.position);
+        if let Some(ref mut hl) = opts.hyperlink {
+            self.register_hyperlink_rel(hl);
+        }
+        if let Some(ref mut hl) = opts.hover {
+            self.register_hyperlink_rel(hl);
+        }
+        let raster_rid = self.allocate_rid();
+        self.rels_media.push(SlideRelMedia {
+            r_id: raster_rid,
+            rel_type: "image".to_string(),
+            target: format!("../media/image{raster_rid}.png"),
+            extn: "png".to_string(),
+            data: png_fallback_data,
+        });
+        let svg_rid = self.allocate_rid();
+        self.rels_media.push(SlideRelMedia {
+            r_id: svg_rid,
+            rel_type: "image".to_string(),
+            target: format!("../media/image{svg_rid}.svg"),
+            extn: "svg".to_string(),
+            data: svg_data.clone(),
+        });
+        let obj = ImageObject {
+            object_name: name,
+            image_rid: svg_rid,
+            extension: "svg".to_string(),
+            data: svg_data,
+            is_svg: true,
+            raster_fallback_rid: Some(raster_rid),
+            options: opts,
+        };
+        self.objects.push(SlideObject::Image(obj));
+        self
+    }
+
+    /// Add an SVG image with a raster (PNG) fallback, both as base64-encoded
+    /// strings. See [`Slide::add_image_svg`](crate::slide::Slide::add_image_svg).
+    pub fn add_image_svg_base64(&mut self, svg_b64: &str, png_fallback_b64: &str, opts: ImageOptions) -> Result<&mut Self, PptxError> {
+        let svg_data = crate::utils::decode_base64_image(svg_b64)?;
+        let fallback_data = crate::utils::decode_base64_image(png_fallback_b64)?;
+        Ok(self.add_image_svg(svg_data, fallback_data, opts))
+    }
+
+    /// Add an SVG image built via [`ImageOptionsBuilder`] — mirrors
+    /// [`Slide::add_image_svg_from`](crate::slide::Slide::add_image_svg_from).
+    pub fn add_image_svg_from(&mut self, builder: ImageOptionsBuilder) -> Result<&mut Self, PptxError> {
+        let (opts, svg_data, svg_b64, fallback_data, fallback_b64) = builder.build_svg();
+        let svg_bytes = match svg_b64 {
+            Some(b64) => crate::utils::decode_base64_image(&b64)?,
+            None => svg_data,
+        };
+        if svg_bytes.is_empty() {
+            return Err(PptxError::InvalidArgument(
+                "add_image_svg_from: no SVG data; call .bytes(svg_bytes, \"svg\") or .base64(svg_b64, \"svg\") first".to_string(),
+            ));
+        }
+        let fallback_bytes = match fallback_b64 {
+            Some(b64) => crate::utils::decode_base64_image(&b64)?,
+            None => fallback_data,
+        };
+        if fallback_bytes.is_empty() {
+            return Err(PptxError::InvalidArgument(
+                "add_image_svg_from: no raster fallback; call .svg_fallback(png_bytes) or .svg_fallback_base64(...) — PowerPoint's base <a:blip> requires a real raster image, not just the SVG".to_string(),
+            ));
+        }
+        Ok(self.add_image_svg(svg_bytes, fallback_bytes, opts))
     }
 
     // ─── Connector ──────────────────────────────────────────
@@ -393,14 +457,7 @@ impl SlideMasterDef {
     /// Add an image from raw bytes.
     pub fn add_image(&mut self, data: Vec<u8>, extension: &str, mut opts: ImageOptions) -> &mut Self {
         let name = self.next_obj_name("Image");
-        if opts.position.w.is_none() || opts.position.h.is_none() {
-            if let Ok(dim) = imagesize::blob_size(&data) {
-                let emu_w = (dim.width as i64) * 914_400 / 96;
-                let emu_h = (dim.height as i64) * 914_400 / 96;
-                if opts.position.w.is_none() { opts.position.w = Some(Coord::Emu(emu_w)); }
-                if opts.position.h.is_none() { opts.position.h = Some(Coord::Emu(emu_h)); }
-            }
-        }
+        crate::objects::image::resolve_image_size(&data, &mut opts.position);
         if let Some(ref mut hl) = opts.hyperlink {
             self.register_hyperlink_rel(hl);
         }
@@ -414,16 +471,14 @@ impl SlideMasterDef {
         self.rels_media.push(SlideRelMedia {
             r_id: rid, rel_type: "image".to_string(), target, extn: extn.clone(), data: data.clone(),
         });
-        let obj = ImageObject { object_name: name, image_rid: rid, extension: extn, data, is_svg, options: opts };
+        let obj = ImageObject { object_name: name, image_rid: rid, extension: extn, data, is_svg, raster_fallback_rid: None, options: opts };
         self.objects.push(SlideObject::Image(obj));
         self
     }
 
     /// Add an image from a base64-encoded string.
     pub fn add_image_base64(&mut self, b64: &str, extension: &str, opts: ImageOptions) -> Result<&mut Self, PptxError> {
-        let raw = if let Some(idx) = b64.find(',') { &b64[idx + 1..] } else { b64 };
-        let data = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, raw)
-            .map_err(|e| PptxError::InvalidArgument(format!("base64 decode error: {e}")))?;
+        let data = crate::utils::decode_base64_image(b64)?;
         Ok(self.add_image(data, extension, opts))
     }
 
@@ -442,6 +497,80 @@ impl SlideMasterDef {
         }
         let extension = ext.unwrap_or_else(|| "png".to_string());
         Ok(self.add_image(data, &extension, opts))
+    }
+
+    /// Add an SVG image with a raster (PNG) fallback — mirrors
+    /// [`Slide::add_image_svg`](crate::slide::Slide::add_image_svg); see there
+    /// for why both media parts are required and independently registered.
+    pub fn add_image_svg(&mut self, svg_data: Vec<u8>, png_fallback_data: Vec<u8>, mut opts: ImageOptions) -> &mut Self {
+        let name = self.next_obj_name("Image");
+        crate::objects::image::resolve_image_size(&png_fallback_data, &mut opts.position);
+        if let Some(ref mut hl) = opts.hyperlink {
+            self.register_hyperlink_rel(hl);
+        }
+        if let Some(ref mut hl) = opts.hover {
+            self.register_hyperlink_rel(hl);
+        }
+        let raster_rid = self.allocate_rid();
+        self.rels_media.push(SlideRelMedia {
+            r_id: raster_rid,
+            rel_type: "image".to_string(),
+            target: format!("../media/image{raster_rid}.png"),
+            extn: "png".to_string(),
+            data: png_fallback_data,
+        });
+        let svg_rid = self.allocate_rid();
+        self.rels_media.push(SlideRelMedia {
+            r_id: svg_rid,
+            rel_type: "image".to_string(),
+            target: format!("../media/image{svg_rid}.svg"),
+            extn: "svg".to_string(),
+            data: svg_data.clone(),
+        });
+        let obj = ImageObject {
+            object_name: name,
+            image_rid: svg_rid,
+            extension: "svg".to_string(),
+            data: svg_data,
+            is_svg: true,
+            raster_fallback_rid: Some(raster_rid),
+            options: opts,
+        };
+        self.objects.push(SlideObject::Image(obj));
+        self
+    }
+
+    /// Add an SVG image with a raster (PNG) fallback, both as base64-encoded
+    /// strings. See [`Slide::add_image_svg`](crate::slide::Slide::add_image_svg).
+    pub fn add_image_svg_base64(&mut self, svg_b64: &str, png_fallback_b64: &str, opts: ImageOptions) -> Result<&mut Self, PptxError> {
+        let svg_data = crate::utils::decode_base64_image(svg_b64)?;
+        let fallback_data = crate::utils::decode_base64_image(png_fallback_b64)?;
+        Ok(self.add_image_svg(svg_data, fallback_data, opts))
+    }
+
+    /// Add an SVG image built via [`ImageOptionsBuilder`] — mirrors
+    /// [`Slide::add_image_svg_from`](crate::slide::Slide::add_image_svg_from).
+    pub fn add_image_svg_from(&mut self, builder: ImageOptionsBuilder) -> Result<&mut Self, PptxError> {
+        let (opts, svg_data, svg_b64, fallback_data, fallback_b64) = builder.build_svg();
+        let svg_bytes = match svg_b64 {
+            Some(b64) => crate::utils::decode_base64_image(&b64)?,
+            None => svg_data,
+        };
+        if svg_bytes.is_empty() {
+            return Err(PptxError::InvalidArgument(
+                "add_image_svg_from: no SVG data; call .bytes(svg_bytes, \"svg\") or .base64(svg_b64, \"svg\") first".to_string(),
+            ));
+        }
+        let fallback_bytes = match fallback_b64 {
+            Some(b64) => crate::utils::decode_base64_image(&b64)?,
+            None => fallback_data,
+        };
+        if fallback_bytes.is_empty() {
+            return Err(PptxError::InvalidArgument(
+                "add_image_svg_from: no raster fallback; call .svg_fallback(png_bytes) or .svg_fallback_base64(...) — PowerPoint's base <a:blip> requires a real raster image, not just the SVG".to_string(),
+            ));
+        }
+        Ok(self.add_image_svg(svg_bytes, fallback_bytes, opts))
     }
 
     // ─── Connector ──────────────────────────────────────────

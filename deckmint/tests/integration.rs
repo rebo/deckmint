@@ -1971,3 +1971,281 @@ fn layout_image_is_embedded_and_relationship_offset_by_one() {
         .collect();
     assert!(!media_names.is_empty(), "layout's image bytes must be written into ppt/media/: found {:?}", media_names);
 }
+
+// ── SVG embedding: raster fallback + asvg:svgBlip extension ───────────────
+
+/// 4x2 red PNG (2:1 aspect ratio) — same generator as the other fixtures but
+/// non-square, so it can pin the aspect-derivation behaviour a 1x1 pixel
+/// can't distinguish.
+fn wide_red_png() -> Vec<u8> {
+    vec![
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x02,
+        0x08, 0x02, 0x00, 0x00, 0x00, 0xF0, 0xCA, 0xEA, 0x34, 0x00, 0x00, 0x00,
+        0x10, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+        0x47, 0x0C, 0xC8, 0x1C, 0x00, 0x6F, 0xAA, 0x07, 0xF9, 0x80, 0xDC, 0x00,
+        0x28, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60,
+        0x82,
+    ]
+}
+
+fn tiny_svg() -> Vec<u8> {
+    br#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><circle cx="5" cy="5" r="4" fill="red"/></svg>"#.to_vec()
+}
+
+/// Parse a `Relationships` XML string into `{rId -> (type_uri, target)}`.
+fn parse_rels(xml: &str) -> std::collections::HashMap<String, (String, String)> {
+    let mut map = std::collections::HashMap::new();
+    for cap in regex_lite_find_rels(xml) {
+        map.insert(cap.0, (cap.1, cap.2));
+    }
+    map
+}
+
+/// Minimal `<Relationship Id="..." Type="..." Target="..."/>` scraper — no
+/// regex crate in dev-dependencies, so this is a small hand-rolled parser
+/// good enough for the flat, single-line rels files this crate emits.
+fn regex_lite_find_rels(xml: &str) -> Vec<(String, String, String)> {
+    let mut out = Vec::new();
+    for piece in xml.split("<Relationship ") {
+        if !piece.contains("Id=\"") {
+            continue;
+        }
+        let id = extract_attr(piece, "Id").unwrap_or_default();
+        let ty = extract_attr(piece, "Type").unwrap_or_default();
+        let target = extract_attr(piece, "Target").unwrap_or_default();
+        if !id.is_empty() {
+            out.push((id, ty, target));
+        }
+    }
+    out
+}
+
+fn extract_attr(s: &str, name: &str) -> Option<String> {
+    let needle = format!("{name}=\"");
+    let start = s.find(&needle)? + needle.len();
+    let end = s[start..].find('"')? + start;
+    Some(s[start..end].to_string())
+}
+
+#[test]
+fn svg_image_registers_two_media_parts_with_correct_blip_pairing() {
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    slide.add_image_svg(
+        tiny_svg(),
+        wide_red_png(),
+        ImageOptionsBuilder::new().pos(1.0, 1.0).size(2.0, 1.0).build_opts(),
+    );
+
+    let bytes = pres.write_validated().expect("valid pptx bytes");
+    let mut zip = open_zip(&bytes);
+
+    // Both media parts must exist as separate files.
+    let media_names: Vec<String> = (0..zip.len())
+        .map(|i| zip.name_for_index(i).unwrap().to_string())
+        .filter(|n| n.starts_with("ppt/media/"))
+        .collect();
+    assert_eq!(media_names.len(), 2, "expected one PNG fallback + one SVG file, found {:?}", media_names);
+    assert!(media_names.iter().any(|n| n.ends_with(".png")), "missing PNG fallback in {:?}", media_names);
+    assert!(media_names.iter().any(|n| n.ends_with(".svg")), "missing SVG file in {:?}", media_names);
+
+    // The picture must carry a raster <a:blip r:embed> AND the asvg:svgBlip extension.
+    let slide_xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
+    assert!(slide_xml.contains("<a:blip r:embed="), "picture must have a base raster blip:\n{slide_xml}");
+    assert!(
+        slide_xml.contains("{96DAC541-7B7A-43D3-8B79-37D633B846F1}"),
+        "picture must carry the SVG extension uri:\n{slide_xml}"
+    );
+    assert!(
+        slide_xml.contains("xmlns:asvg=\"http://schemas.microsoft.com/office/drawing/2016/SVG/main\""),
+        "svgBlip must declare the asvg namespace:\n{slide_xml}"
+    );
+
+    // Extract the two r:embed rIds from the picture and confirm they're DIFFERENT
+    // (the historical bug: svgBlip rId with a base blip that dangled at rId-1).
+    let base_rid = slide_xml
+        .split("<a:blip r:embed=\"rId").nth(1).unwrap()
+        .split('"').next().unwrap().to_string();
+    let svg_rid = slide_xml
+        .split("<asvg:svgBlip").nth(1).unwrap()
+        .split("r:embed=\"rId").nth(1).unwrap()
+        .split('"').next().unwrap().to_string();
+    assert_ne!(base_rid, svg_rid, "raster fallback and SVG must use distinct rIds:\n{slide_xml}");
+
+    // Both rIds must resolve to real, distinct, physically-present media in the rels file.
+    let rels_xml = read_entry(&mut zip, "ppt/slides/_rels/slide1.xml.rels");
+    let rels = parse_rels(&rels_xml);
+    let base_entry = rels.get(&format!("rId{base_rid}")).unwrap_or_else(|| panic!("rId{base_rid} missing from rels:\n{rels_xml}"));
+    let svg_entry = rels.get(&format!("rId{svg_rid}")).unwrap_or_else(|| panic!("rId{svg_rid} missing from rels:\n{rels_xml}"));
+    assert!(base_entry.0.ends_with("/image"), "base blip's rel must be an image relationship: {base_entry:?}");
+    assert!(base_entry.1.ends_with(".png"), "base blip's target must be the PNG fallback: {base_entry:?}");
+    assert!(svg_entry.0.ends_with("/image"), "svgBlip's rel must be an image relationship: {svg_entry:?}");
+    assert!(svg_entry.1.ends_with(".svg"), "svgBlip's target must be the SVG file: {svg_entry:?}");
+    assert_ne!(base_entry.1, svg_entry.1, "the two rels must point at two different physical files");
+
+    // And the targets must actually exist as zip entries.
+    for target in [&base_entry.1, &svg_entry.1] {
+        let resolved = format!("ppt/{}", target.trim_start_matches("../"));
+        assert!(zip.by_name(&resolved).is_ok(), "{resolved} referenced by rels but missing from the zip");
+    }
+}
+
+#[test]
+fn svg_image_svg_from_builder_variant_round_trips() {
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    slide.add_image_svg_from(
+        ImageOptionsBuilder::new()
+            .bytes(tiny_svg(), "svg")
+            .svg_fallback(wide_red_png())
+            .pos(0.5, 0.5),
+    ).expect("add_image_svg_from should succeed with both parts supplied");
+
+    let bytes = pres.write_validated().expect("valid pptx bytes");
+    let mut zip = open_zip(&bytes);
+    let slide_xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
+    assert!(slide_xml.contains("<p:pic>"), "must embed a picture shape:\n{slide_xml}");
+    assert!(slide_xml.contains("asvg:svgBlip"), "must carry the svgBlip extension:\n{slide_xml}");
+}
+
+#[test]
+fn add_image_svg_from_errors_when_fallback_is_missing() {
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    let result = slide.add_image_svg_from(
+        ImageOptionsBuilder::new().bytes(tiny_svg(), "svg"), // no .svg_fallback(...)
+    );
+    assert!(result.is_err(), "add_image_svg_from without a raster fallback must fail, not silently dangle");
+}
+
+#[test]
+fn add_image_svg_from_errors_when_svg_data_is_missing() {
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    let result = slide.add_image_svg_from(
+        ImageOptionsBuilder::new().svg_fallback(wide_red_png()), // no primary SVG bytes
+    );
+    assert!(result.is_err(), "add_image_svg_from without SVG data must fail");
+}
+
+#[test]
+fn svg_image_on_layout_offsets_both_blip_rids_by_one() {
+    // Same offset-by-one convention as `layout_image_is_embedded_and_relationship_offset_by_one`,
+    // but for BOTH the raster fallback and the SVG's own rId — rId1 in a
+    // slideLayout.xml.rels is always the slideMaster relationship.
+    let mut pres = Presentation::new();
+    pres.define_layout("Challenge Question", None, None)
+        .add_image_svg(tiny_svg(), wide_red_png(), ImageOptionsBuilder::new().pos(0.5, 0.5).size(0.7, 0.7).build_opts());
+    pres.add_slide_with_layout("Challenge Question");
+
+    let bytes = pres.write_validated().expect("valid pptx bytes");
+    let mut zip = open_zip(&bytes);
+
+    let layout_xml = read_entry(&mut zip, "ppt/slideLayouts/slideLayout2.xml");
+    assert!(layout_xml.contains("<p:pic>"), "layout must embed the picture shape:\n{layout_xml}");
+    // Locally allocated rId1 (raster) / rId2 (svg) shift to rId2 / rId3 once
+    // packaged (rId1 in the layout's rels is reserved for the slideMaster rel).
+    assert!(layout_xml.contains("r:embed=\"rId2\""), "raster fallback must land on rId2:\n{layout_xml}");
+    assert!(layout_xml.contains("r:embed=\"rId3\""), "svgBlip must land on rId3:\n{layout_xml}");
+
+    let layout_rels = read_entry(&mut zip, "ppt/slideLayouts/_rels/slideLayout2.xml.rels");
+    let rels = parse_rels(&layout_rels);
+    assert!(rels.get("rId1").map_or(false, |(_, t)| t.contains("slideMaster1.xml")), "rId1 must be the slideMaster rel: {layout_rels}");
+    assert!(rels.get("rId2").map_or(false, |(_, t)| t.ends_with(".png")), "rId2 must be the PNG fallback: {layout_rels}");
+    assert!(rels.get("rId3").map_or(false, |(_, t)| t.ends_with(".svg")), "rId3 must be the SVG file: {layout_rels}");
+}
+
+#[test]
+fn svg_image_on_master_offsets_both_blip_rids() {
+    use deckmint::SlideMasterDef;
+    let mut master = SlideMasterDef::new("With SVG Logo");
+    master.add_image_svg(tiny_svg(), wide_red_png(), ImageOptionsBuilder::new().pos(0.2, 0.2).size(0.5, 0.5).build_opts());
+
+    let mut pres = Presentation::new();
+    pres.define_master(master);
+    pres.add_slide();
+
+    let bytes = pres.write_validated().expect("valid pptx bytes");
+    let mut zip = open_zip(&bytes);
+
+    // rid_offset = slide_layouts.len() (1, the implicit DEFAULT) + 1 (theme) = 2,
+    // so the master's locally-allocated rId1 (raster) / rId2 (svg) become rId3 / rId4.
+    let master_xml = read_entry(&mut zip, "ppt/slideMasters/slideMaster1.xml");
+    assert!(master_xml.contains("r:embed=\"rId3\""), "raster fallback must land on rId3:\n{master_xml}");
+    assert!(master_xml.contains("r:embed=\"rId4\""), "svgBlip must land on rId4:\n{master_xml}");
+
+    let master_rels = read_entry(&mut zip, "ppt/slideMasters/_rels/slideMaster1.xml.rels");
+    let rels = parse_rels(&master_rels);
+    assert!(rels.get("rId3").map_or(false, |(_, t)| t.ends_with(".png")), "rId3 must be the PNG fallback: {master_rels}");
+    assert!(rels.get("rId4").map_or(false, |(_, t)| t.ends_with(".svg")), "rId4 must be the SVG file: {master_rels}");
+
+    let media_names: Vec<String> = (0..zip.len())
+        .map(|i| zip.name_for_index(i).unwrap().to_string())
+        .filter(|n| n.starts_with("ppt/media/"))
+        .collect();
+    assert_eq!(media_names.len(), 2, "master's SVG + PNG fallback must both be written: {:?}", media_names);
+}
+
+// ── Aspect-ratio companion fix ─────────────────────────────────────────────
+//
+// wide_red_png() is 4x2 pixels (2:1 aspect ratio). These pin the fix for a bug
+// where giving only `w` (or only `h`) filled the missing side with the raw
+// intrinsic pixel size instead of scaling it to match the side that WAS given.
+
+#[test]
+fn image_w_only_derives_h_from_intrinsic_aspect_ratio() {
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    slide.add_image(wide_red_png(), "png", ImageOptionsBuilder::new().pos(1.0, 1.0).w(4.0).build_opts());
+
+    let bytes = pres.write_validated().expect("valid pptx bytes");
+    let mut zip = open_zip(&bytes);
+    let slide_xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
+    // w=4in -> cx=3657600 EMU; 2:1 source aspect -> derived cy=1828800 EMU (2in), not the
+    // raw intrinsic pixel height (which would round to a tiny fraction of an inch).
+    assert!(slide_xml.contains("cx=\"3657600\""), "expected cx=4in in EMU:\n{slide_xml}");
+    assert!(slide_xml.contains("cy=\"1828800\""), "expected cy derived from aspect ratio (2in), not raw intrinsic pixels:\n{slide_xml}");
+}
+
+#[test]
+fn image_h_only_derives_w_from_intrinsic_aspect_ratio() {
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    slide.add_image(wide_red_png(), "png", ImageOptionsBuilder::new().pos(1.0, 1.0).h(2.0).build_opts());
+
+    let bytes = pres.write_validated().expect("valid pptx bytes");
+    let mut zip = open_zip(&bytes);
+    let slide_xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
+    assert!(slide_xml.contains("cy=\"1828800\""), "expected cy=2in in EMU:\n{slide_xml}");
+    assert!(slide_xml.contains("cx=\"3657600\""), "expected cx derived from aspect ratio (4in):\n{slide_xml}");
+}
+
+#[test]
+fn image_both_w_and_h_given_are_honoured_exactly_even_if_distorting() {
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    // A 1in x 1in box on a 2:1 source — deliberately NOT aspect-matched.
+    slide.add_image(wide_red_png(), "png", ImageOptionsBuilder::new().pos(1.0, 1.0).size(1.0, 1.0).build_opts());
+
+    let bytes = pres.write_validated().expect("valid pptx bytes");
+    let mut zip = open_zip(&bytes);
+    let slide_xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
+    assert!(slide_xml.contains("cx=\"914400\""), "explicit w must be honoured as-is:\n{slide_xml}");
+    assert!(slide_xml.contains("cy=\"914400\""), "explicit h must be honoured as-is, even though it distorts the 2:1 source:\n{slide_xml}");
+}
+
+#[test]
+fn svg_image_auto_dimensions_from_png_fallback_with_aspect_fix() {
+    // add_image_svg's auto-dimension path reads the PNG FALLBACK's intrinsic
+    // size (not the SVG's), and applies the same aspect-derivation fix.
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    slide.add_image_svg(tiny_svg(), wide_red_png(), ImageOptionsBuilder::new().pos(1.0, 1.0).w(4.0).build_opts());
+
+    let bytes = pres.write_validated().expect("valid pptx bytes");
+    let mut zip = open_zip(&bytes);
+    let slide_xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
+    assert!(slide_xml.contains("cx=\"3657600\""), "expected cx=4in in EMU:\n{slide_xml}");
+    assert!(slide_xml.contains("cy=\"1828800\""), "expected cy derived from the PNG fallback's 2:1 aspect ratio:\n{slide_xml}");
+}

@@ -177,6 +177,16 @@ pub fn coord_to_emu(value: f64, is_percent: bool, pct_value: f64, is_x: bool, la
     get_smart_parse_number(value, is_percent, pct_value, layout_dim)
 }
 
+/// Decode a base64 image string, stripping a leading `data:...;base64,` URI
+/// prefix if present. Shared by the `add_image_svg_base64`/`add_image_svg_from`
+/// family (`Slide`, `SlideLayout`, `SlideMasterDef`) so the two-part SVG+raster
+/// decode isn't repeated three times over.
+pub(crate) fn decode_base64_image(b64: &str) -> Result<Vec<u8>, crate::error::PptxError> {
+    let raw = if let Some(idx) = b64.find(',') { &b64[idx + 1..] } else { b64 };
+    base64::Engine::decode(&base64::engine::general_purpose::STANDARD, raw)
+        .map_err(|e| crate::error::PptxError::InvalidArgument(format!("base64 decode error: {e}")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

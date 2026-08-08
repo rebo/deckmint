@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160" viewBox="0 0 240 160">
+  <rect x="4" y="4" width="232" height="152" rx="16" fill="#1F3864"/>
+  <circle cx="70" cy="80" r="46" fill="#EEC3E3"/>
+  <path d="M120 130 L170 40 L220 130 Z" fill="#F2A65A" stroke="#FFFFFF" stroke-width="4"/>
+  <text x="120" y="150" font-family="Arial, sans-serif" font-size="16" fill="#FFFFFF" text-anchor="middle">deckmint SVG</text>
+</svg>

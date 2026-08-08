@@ -1,3 +1,5 @@
+use imagesize;
+
 use crate::types::{AnimationEffect, Coord, HyperlinkProps, ImageColorAdjust, PositionProps, ShadowProps};
 
 /// An image placed on a slide
@@ -6,13 +8,32 @@ pub struct ImageObject {
     /// Internal object name for relationship tracking.
     pub object_name: String,
     /// rId in the slide's media relationships.
+    ///
+    /// For a raster image this is the only media rId, referenced by the
+    /// picture's base `<a:blip r:embed>`. For an SVG image (`is_svg == true`,
+    /// built via `add_image_svg`) this is instead the **SVG's own** media rId
+    /// — referenced from the `<asvg:svgBlip r:embed>` extension — while the
+    /// raster fallback PowerPoint's base `<a:blip r:embed>` points at lives in
+    /// [`raster_fallback_rid`].
     pub image_rid: u32,
-    /// File extension (png, jpg, gif, svg, etc.).
+    /// File extension (png, jpg, gif, svg, etc.). For an SVG image this is
+    /// always `"svg"` — the raster fallback's own extension (always `"png"`)
+    /// isn't tracked here since it isn't rendered from this field.
     pub extension: String,
-    /// Actual image bytes (base64-decoded).
+    /// Actual image bytes (base64-decoded). For an SVG image this is the SVG
+    /// source; the raster fallback's bytes live only in the slide/layout/
+    /// master's `rels_media` (registered separately by `add_image_svg`).
     pub data: Vec<u8>,
-    /// Whether this image is an SVG (needs special XML handling).
+    /// Whether this image is an SVG (needs special XML handling — a raster
+    /// `<a:blip>` PLUS an `asvg:svgBlip` extension pointing at the SVG rel).
     pub is_svg: bool,
+    /// rId of the raster (PNG) fallback media, present only when `is_svg` is
+    /// `true`. PowerPoint's base `<a:blip r:embed>` on an SVG picture must
+    /// reference a real, independently-addressable raster image — the
+    /// `asvg:svgBlip` extension is additive, not a replacement, so this rId
+    /// has to point at its own media part, never reuse or guess at
+    /// `image_rid - 1`.
+    pub raster_fallback_rid: Option<u32>,
     /// Placement and styling options for this image.
     pub options: ImageOptions,
 }
@@ -87,6 +108,62 @@ pub struct ImageSizing {
     pub h: Option<f64>,
 }
 
+/// Auto-fill missing width/height on `position` from the intrinsic pixel size
+/// of `data` (96 DPI), preserving the intrinsic aspect ratio when only one of
+/// width/height is explicitly set.
+///
+/// - Neither set: both come straight from the intrinsic pixel size, as before.
+/// - Only one set (the common "give me a natural width, keep proportions"
+///   case): the other is now *derived* from the intrinsic aspect ratio scaled
+///   to match the side that was given — not filled in with the raw intrinsic
+///   size regardless of what the caller actually asked for. (That was the bug:
+///   `.w(4.0)` alone on a 2:1 image used to still emit the source's raw
+///   intrinsic height, silently stretching or squashing the picture instead of
+///   scaling it.)
+/// - Both set: both are honoured exactly as given — giving a `w`/`h` pair
+///   whose ratio doesn't match the source image will visibly distort it;
+///   that's on the caller.
+/// - A `Coord::Percent` side can't be resolved to EMU here (that needs the
+///   slide's own dimensions, unavailable at `add_image` time), so a percent
+///   side filling in for a missing partner falls back to the raw intrinsic
+///   size for that partner rather than a derived one.
+pub(crate) fn resolve_image_size(data: &[u8], position: &mut PositionProps) {
+    if position.w.is_some() && position.h.is_some() {
+        return;
+    }
+    let Ok(dim) = imagesize::blob_size(data) else { return };
+    if dim.width == 0 || dim.height == 0 {
+        return;
+    }
+    // Assume 96 DPI for pixel→EMU conversion, matching the rest of the crate.
+    let emu_w = (dim.width as i64) * 914_400 / 96;
+    let emu_h = (dim.height as i64) * 914_400 / 96;
+
+    match (&position.w, &position.h) {
+        (None, None) => {
+            position.w = Some(Coord::Emu(emu_w));
+            position.h = Some(Coord::Emu(emu_h));
+        }
+        (Some(Coord::Percent(_)), None) => {
+            position.h = Some(Coord::Emu(emu_h));
+        }
+        (None, Some(Coord::Percent(_))) => {
+            position.w = Some(Coord::Emu(emu_w));
+        }
+        (Some(w), None) => {
+            let w_emu = w.to_emu(0);
+            let derived_h = (w_emu as f64 * emu_h as f64 / emu_w as f64).round() as i64;
+            position.h = Some(Coord::Emu(derived_h));
+        }
+        (None, Some(h)) => {
+            let h_emu = h.to_emu(0);
+            let derived_w = (h_emu as f64 * emu_w as f64 / emu_h as f64).round() as i64;
+            position.w = Some(Coord::Emu(derived_w));
+        }
+        (Some(_), Some(_)) => unreachable!("handled by the early return above"),
+    }
+}
+
 /// Strategy for fitting an image within its bounding box.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ImageSizingType {
@@ -109,6 +186,15 @@ pub struct ImageOptionsBuilder {
     pub data_b64: Option<String>,
     /// File extension override (e.g. "png", "jpg").
     pub extension: Option<String>,
+    /// Raster (PNG) fallback bytes for an SVG image, set via
+    /// [`svg_fallback`](Self::svg_fallback). Only meaningful alongside
+    /// `.bytes(svg_bytes, "svg")` / `.base64(svg_b64, "svg")`, and consumed by
+    /// `add_image_svg_from` (not `add_image_from`, which knows nothing about
+    /// SVG's two-media-part requirement).
+    pub svg_fallback_data: Vec<u8>,
+    /// Base64-encoded raster fallback, set via
+    /// [`svg_fallback_base64`](Self::svg_fallback_base64).
+    pub svg_fallback_data_b64: Option<String>,
 }
 
 impl ImageOptionsBuilder {
@@ -120,6 +206,8 @@ impl ImageOptionsBuilder {
             path: None,
             data_b64: None,
             extension: None,
+            svg_fallback_data: Vec::new(),
+            svg_fallback_data_b64: None,
         }
     }
 
@@ -209,9 +297,35 @@ impl ImageOptionsBuilder {
         self
     }
 
+    /// Set the raster fallback image bytes for an SVG (used by
+    /// `add_image_svg_from` and its `SlideLayout`/`SlideMasterDef`
+    /// equivalents). PowerPoint's base `<a:blip>` always points at this
+    /// raster fallback; the SVG itself is referenced through the
+    /// `asvg:svgBlip` extension and takes over rendering wherever the host
+    /// supports it.
+    pub fn svg_fallback(mut self, data: Vec<u8>) -> Self {
+        self.svg_fallback_data = data;
+        self
+    }
+
+    /// Set the raster fallback as base64-encoded data (with or without a
+    /// `data:` URI prefix). See [`svg_fallback`](Self::svg_fallback).
+    pub fn svg_fallback_base64(mut self, b64: impl Into<String>) -> Self {
+        self.svg_fallback_data_b64 = Some(b64.into());
+        self
+    }
+
     /// Consume the builder and return the options, raw bytes, base64 data, and extension.
     pub fn build(self) -> (ImageOptions, Vec<u8>, Option<String>, Option<String>) {
         (self.opts, self.data, self.data_b64, self.extension)
+    }
+
+    /// Consume the builder and return the options plus both the primary
+    /// (SVG) data and the raster fallback data, each either as raw bytes or
+    /// base64 — for `add_image_svg_from` and its `SlideLayout`/
+    /// `SlideMasterDef` equivalents.
+    pub fn build_svg(self) -> (ImageOptions, Vec<u8>, Option<String>, Vec<u8>, Option<String>) {
+        (self.opts, self.data, self.data_b64, self.svg_fallback_data, self.svg_fallback_data_b64)
     }
 
     /// Consume the builder and return only the image options.

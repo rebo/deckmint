@@ -415,9 +415,23 @@ fn gen_xml_image_object(img: &ImageObject, obj_id: usize, pres: &Presentation) -
         if let Some(t) = img.options.transparency {
             s.push_str(&format!("<a:alphaModFix amt=\"{}\"/>", ((100.0 - t) * 1000.0).round() as i64));
         }
-        s.push_str("<a:extLst><a:ext uri=\"{96DAC541-7B7A-43D3-8B79-37D633B846F1}\">");
+        // The extLst needs a14:useLocalDpi as well as asvg:svgBlip — every
+        // genuine Office-authored SVG picture (verified against a real
+        // Excel-generated xdr:blipFill) carries BOTH extensions, useLocalDpi
+        // first. Without it, PowerPoint silently declines to live-render the
+        // vector content: it still recognises the svgBlip extension well
+        // enough for "Convert to Shape" (which reads the ext list directly),
+        // but the normal render path never engages, leaving the raster
+        // fallback on screen. val="0" matches real Office output (it tells
+        // the host not to rescale off the picture's embedded/local DPI).
+        s.push_str("<a:extLst>");
+        s.push_str("<a:ext uri=\"{28A0092B-C50C-407E-A947-70E740481C1C}\">");
+        s.push_str("<a14:useLocalDpi xmlns:a14=\"http://schemas.microsoft.com/office/drawing/2010/main\" val=\"0\"/>");
+        s.push_str("</a:ext>");
+        s.push_str("<a:ext uri=\"{96DAC541-7B7A-43D3-8B79-37D633B846F1}\">");
         s.push_str(&format!("<asvg:svgBlip xmlns:asvg=\"http://schemas.microsoft.com/office/drawing/2016/SVG/main\" r:embed=\"rId{rid}\"/>"));
-        s.push_str("</a:ext></a:extLst>");
+        s.push_str("</a:ext>");
+        s.push_str("</a:extLst>");
         s.push_str("</a:blip>");
     } else {
         s.push_str(&format!("<a:blip r:embed=\"rId{rid}\">"));

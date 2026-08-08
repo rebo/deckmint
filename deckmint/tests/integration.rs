@@ -2062,6 +2062,26 @@ fn svg_image_registers_two_media_parts_with_correct_blip_pairing() {
         "svgBlip must declare the asvg namespace:\n{slide_xml}"
     );
 
+    // The picture must ALSO carry the a14:useLocalDpi extension alongside
+    // svgBlip — every genuine Office-authored SVG picture does (verified
+    // against a real Excel-generated xdr:blipFill), and PowerPoint's live
+    // SVG renderer silently declines to engage without it: "Convert to
+    // Shape" still works (it reads the ext list directly), but the normal
+    // render path falls back to the raster and stays there.
+    assert!(
+        slide_xml.contains("{28A0092B-C50C-407E-A947-70E740481C1C}"),
+        "picture must carry the useLocalDpi extension uri alongside svgBlip:\n{slide_xml}"
+    );
+    assert!(
+        slide_xml.contains("<a14:useLocalDpi xmlns:a14=\"http://schemas.microsoft.com/office/drawing/2010/main\" val=\"0\"/>"),
+        "must emit a14:useLocalDpi val=\"0\" matching real Office output:\n{slide_xml}"
+    );
+    assert!(
+        slide_xml.find("{28A0092B-C50C-407E-A947-70E740481C1C}").unwrap()
+            < slide_xml.find("{96DAC541-7B7A-43D3-8B79-37D633B846F1}").unwrap(),
+        "useLocalDpi must precede svgBlip in the extLst, matching real Office output:\n{slide_xml}"
+    );
+
     // Extract the two r:embed rIds from the picture and confirm they're DIFFERENT
     // (the historical bug: svgBlip rId with a base blip that dangled at rId-1).
     let base_rid = slide_xml

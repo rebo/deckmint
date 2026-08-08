@@ -1845,3 +1845,129 @@ fn master_with_image_produces_valid_pptx() {
         .collect();
     assert!(!media_names.is_empty(), "media file should exist in archive: found {:?}", media_names);
 }
+
+// ── named-layout anatomy: chrome on layouts, slides bind by name ──────────
+
+#[test]
+fn define_layout_returns_a_buildable_layout() {
+    let mut pres = Presentation::new();
+    let layout = pres.define_layout("Fluency Practise", None, None);
+    layout.add_shape(ShapeType::RoundRect, ShapeOptionsBuilder::new()
+        .pos(0.0, 0.0).size(3.0, 0.35).fill_color("EEC3E3").build());
+    layout.add_text("Fluency Practise", TextOptionsBuilder::new()
+        .pos(0.0, 0.0).size(3.0, 0.35).build());
+    assert_eq!(layout.objects.len(), 2);
+    assert_eq!(layout.name, "Fluency Practise");
+}
+
+#[test]
+fn multiple_named_layouts_each_carry_their_own_shapes() {
+    let mut pres = Presentation::new();
+    pres.define_layout("Do Now", None, None)
+        .add_shape(ShapeType::RoundRect, ShapeOptionsBuilder::new().pos(0.0, 0.0).size(2.0, 0.35).fill_color("DEEBF7").build());
+    pres.define_layout("Fluency Practise", None, None)
+        .add_shape(ShapeType::RoundRect, ShapeOptionsBuilder::new().pos(0.0, 0.0).size(3.0, 0.35).fill_color("EEC3E3").build());
+
+    pres.add_slide_with_layout("Do Now").add_text("Do Now content", TextOptionsBuilder::new().pos(1.0, 1.0).size(4.0, 1.0).build());
+    pres.add_slide_with_layout("Fluency Practise").add_text("Fluency content", TextOptionsBuilder::new().pos(1.0, 1.0).size(4.0, 1.0).build());
+
+    let bytes = pres.write_validated().expect("valid pptx bytes");
+    let mut zip = open_zip(&bytes);
+
+    // slideLayout2 = "Do Now" (index 1: slide_layouts[0] is the implicit DEFAULT).
+    let do_now_layout = read_entry(&mut zip, "ppt/slideLayouts/slideLayout2.xml");
+    assert!(do_now_layout.contains(r#"name="Do Now""#), "slideLayout2.xml must carry name=\"Do Now\":\n{do_now_layout}");
+    assert!(do_now_layout.contains("DEEBF7"), "slideLayout2.xml must carry the Do Now chrome shape's fill:\n{do_now_layout}");
+    assert!(!do_now_layout.contains("EEC3E3"), "slideLayout2.xml must NOT carry Fluency's chrome — layouts don't leak into each other:\n{do_now_layout}");
+
+    let fluency_layout = read_entry(&mut zip, "ppt/slideLayouts/slideLayout3.xml");
+    assert!(fluency_layout.contains(r#"name="Fluency Practise""#));
+    assert!(fluency_layout.contains("EEC3E3"));
+
+    // The two slides must NOT carry the chrome shapes at all — content only.
+    let slide1 = read_entry(&mut zip, "ppt/slides/slide1.xml");
+    assert!(!slide1.contains("DEEBF7"), "slide1.xml must not duplicate its layout's chrome:\n{slide1}");
+    assert!(slide1.contains("Do Now content"));
+    let slide2 = read_entry(&mut zip, "ppt/slides/slide2.xml");
+    assert!(!slide2.contains("EEC3E3"), "slide2.xml must not duplicate its layout's chrome:\n{slide2}");
+    assert!(slide2.contains("Fluency content"));
+}
+
+#[test]
+fn add_slide_with_layout_points_the_slide_rel_at_the_right_layout() {
+    let mut pres = Presentation::new();
+    pres.define_layout("Do Now", None, None);
+    pres.define_layout("Fluency Practise", None, None);
+    pres.add_slide_with_layout("Fluency Practise");
+
+    let bytes = pres.write_validated().expect("valid pptx bytes");
+    let mut zip = open_zip(&bytes);
+    let rels = read_entry(&mut zip, "ppt/slides/_rels/slide1.xml.rels");
+    // "Do Now" is slide_layouts[1] -> slideLayout2.xml; "Fluency Practise" is
+    // slide_layouts[2] -> slideLayout3.xml. The bound slide must point at 3, not
+    // silently fall back to 1 (the pre-fix hardcoded "every slide uses layout 1").
+    assert!(rels.contains("slideLayout3.xml"), "slide1's rId1 must target slideLayout3.xml (\"Fluency Practise\"): {rels}");
+    assert!(!rels.contains("slideLayout1.xml"), "slide1 must not fall back to the DEFAULT layout: {rels}");
+}
+
+#[test]
+#[should_panic(expected = "no layout named")]
+fn add_slide_with_layout_panics_on_an_unknown_name() {
+    let mut pres = Presentation::new();
+    pres.add_slide_with_layout("Never Defined");
+}
+
+#[test]
+fn add_slide_without_a_layout_still_uses_the_default_layout() {
+    // Regression guard: binding some slides to named layouts must not disturb
+    // plain `add_slide()` callers, who should keep landing on slide_layouts[0].
+    let mut pres = Presentation::new();
+    pres.define_layout("Do Now", None, None);
+    pres.add_slide().add_text("plain", TextOptionsBuilder::new().pos(1.0, 1.0).size(4.0, 1.0).build());
+
+    let bytes = pres.write_validated().expect("valid pptx bytes");
+    let mut zip = open_zip(&bytes);
+    let rels = read_entry(&mut zip, "ppt/slides/_rels/slide1.xml.rels");
+    assert!(rels.contains("slideLayout1.xml"), "add_slide() with no explicit layout must still bind to slideLayout1.xml (DEFAULT): {rels}");
+}
+
+#[test]
+fn layout_image_is_embedded_and_relationship_offset_by_one() {
+    // 1x1 red PNG, same fixture as `master_add_image_registers_media`.
+    let png = vec![
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+        0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
+        0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+        0x00, 0x00, 0x03, 0x00, 0x01, 0x36, 0x28, 0x19,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+        0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
+    let mut pres = Presentation::new();
+    pres.define_layout("Challenge Question", None, None)
+        .add_image(png, "png", ImageOptionsBuilder::new().pos(0.5, 0.5).size(0.7, 0.7).build_opts());
+    pres.add_slide_with_layout("Challenge Question");
+
+    let bytes = pres.write_validated().expect("valid pptx bytes");
+    let mut zip = open_zip(&bytes);
+
+    let layout_xml = read_entry(&mut zip, "ppt/slideLayouts/slideLayout2.xml");
+    assert!(layout_xml.contains("<p:pic>"), "layout must embed the picture shape:\n{layout_xml}");
+    // rId1 in a slideLayout.xml.rels is always the slideMaster relationship
+    // (see `rels_xml::make_xml_slide_layout_rel`), so the layout's own image
+    // (locally allocated rId1 before the +1 packaging offset) must land on
+    // rId2, not collide with rId1.
+    assert!(layout_xml.contains("r:embed=\"rId2\""), "layout's embedded image must reference rId2 (rId1 is reserved for the slideMaster rel):\n{layout_xml}");
+
+    let layout_rels = read_entry(&mut zip, "ppt/slideLayouts/_rels/slideLayout2.xml.rels");
+    assert!(layout_rels.contains(r#"Id="rId1""#) && layout_rels.contains("slideMaster1.xml"), "rId1 must be the slideMaster relationship: {layout_rels}");
+    assert!(layout_rels.contains(r#"Id="rId2""#) && layout_rels.contains("relationships/image"), "rId2 must be the layout's own image relationship: {layout_rels}");
+
+    let media_names: Vec<String> = (0..zip.len())
+        .map(|i| zip.name_for_index(i).unwrap().to_string())
+        .filter(|n| n.starts_with("ppt/media/"))
+        .collect();
+    assert!(!media_names.is_empty(), "layout's image bytes must be written into ppt/media/: found {:?}", media_names);
+}

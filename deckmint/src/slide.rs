@@ -37,6 +37,12 @@ pub struct Slide {
     pub slide_number: Option<SlideNumberProps>,
     /// Optional slide transition effect.
     pub transition: Option<TransitionProps>,
+    /// Which [`SlideLayout`](crate::presentation::SlideLayout) (0-based index
+    /// into `Presentation::slide_layouts`) this slide is bound to. `None`
+    /// means the first-defined layout (`slide_layouts[0]`, "DEFAULT" unless
+    /// overridden) — set via [`Presentation::add_slide_with_layout`], never
+    /// directly, so it's always validated against a real defined layout.
+    pub(crate) layout_idx: Option<usize>,
     /// Next object counter for auto-naming
     obj_counter: u32,
 }
@@ -68,6 +74,7 @@ impl Slide {
             notes: None,
             slide_number: None,
             transition: None,
+            layout_idx: None,
             obj_counter: 0,
         }
     }

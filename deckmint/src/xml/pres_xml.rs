@@ -44,6 +44,11 @@ pub fn make_xml_content_types(pres: &Presentation) -> String {
             used_extns.insert(&media.extn);
         }
     }
+    for layout in &pres.slide_layouts {
+        for media in &layout.rels_media {
+            used_extns.insert(&media.extn);
+        }
+    }
     for (ext, mime) in mime_map {
         if used_extns.contains(ext) {
             s.push_str(&format!("<Default Extension=\"{ext}\" ContentType=\"{mime}\"/>"));
@@ -558,11 +563,31 @@ xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">");
 // ppt/slideLayouts/slideLayoutN.xml
 // ─────────────────────────────────────────────────────────────
 
-pub fn make_xml_layout(layout: &SlideLayout) -> String {
+pub fn make_xml_layout(layout: &SlideLayout, pres: &Presentation) -> String {
     let name = &layout.name;
     // Note: slide dimensions are presentation-level (p:sldSz in presentation.xml).
     // p:sldLayout does NOT support cx/cy attributes — layout.width/height are stored
     // for potential future use (e.g. informing presentation.xml) but not emitted here.
+
+    // A layout's own image rIds are allocated locally (`SlideLayout::allocate_rid`,
+    // counting from 1) but rId1 in `slideLayoutN.xml.rels` is always reserved
+    // for the slideMaster relationship (see `rels_xml::make_xml_slide_layout_rel`),
+    // so every media/hyperlink rId this layout's objects reference needs to be
+    // shifted up by exactly 1 to land on its real package rId — same pattern
+    // `make_xml_master` uses for the master (there the offset is
+    // `layout_count + 1`; here it's always 1, since a layout file has no
+    // sibling layouts ahead of it, only its one slideMaster rel).
+    let content = if layout.objects.is_empty() {
+        String::new()
+    } else {
+        let mut objects = layout.objects.clone();
+        remap_object_rids(&mut objects, 1);
+        // Same rendering path `make_xml_master` uses for the master's own
+        // objects — `pres` resolves percentage-based positions against the
+        // presentation's canvas size, same as any slide.
+        crate::xml::slide_xml::gen_xml_objects(&objects, pres)
+    };
+
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n\
 <p:sldLayout \
@@ -575,6 +600,7 @@ preserve=\"1\">\
 <p:nvGrpSpPr><p:cNvPr id=\"1\" name=\"\"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>\
 <p:grpSpPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/>\
 <a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"0\" cy=\"0\"/></a:xfrm></p:grpSpPr>\
+{content}\
 </p:spTree>\
 </p:cSld>\
 <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>\

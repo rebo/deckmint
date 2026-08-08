@@ -139,16 +139,56 @@ Target=\"{target}\"/>",
 }
 
 // ─────────────────────────────────────────────────────────────
-// ppt/slideLayouts/_rels/slideLayout1.xml.rels  (static — one layout)
+// ppt/slideLayouts/_rels/slideLayoutN.xml.rels
 // ─────────────────────────────────────────────────────────────
 
-pub fn make_xml_slide_layout_rel() -> &'static str {
-    "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n\
-<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\
-<Relationship Id=\"rId1\" \
+/// `rId1` is always the slideMaster relationship (every layout has exactly
+/// one, and it's first — matches `scripts/check_pptx.py`'s repair-pattern
+/// convention of "expected/first" rIds being structural, not incidental).
+/// Any chrome media/hyperlinks the layout's own objects reference (an
+/// archetype icon, say) follow at `rId2+`, using the same `r_id + 1` offset
+/// `pres_xml::make_xml_layout` shifted those objects' own rIds by.
+pub fn make_xml_slide_layout_rel(rels: &[SlideRel], rels_media: &[SlideRelMedia], media_targets: &[String]) -> String {
+    const RID_OFFSET: u32 = 1;
+    let mut s = String::new();
+    s.push_str(&format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>{CRLF}\
+<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+    ));
+    s.push_str(
+        "<Relationship Id=\"rId1\" \
 Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster\" \
-Target=\"../slideMasters/slideMaster1.xml\"/>\
-</Relationships>"
+Target=\"../slideMasters/slideMaster1.xml\"/>"
+    );
+    for rel in rels {
+        let actual_rid = rel.r_id + RID_OFFSET;
+        if rel.rel_type.to_lowercase().contains("hyperlink") {
+            if rel.data.as_deref() == Some("slide") {
+                s.push_str(&format!(
+                    "<Relationship Id=\"rId{actual_rid}\" \
+Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" \
+Target=\"../slides/slide{}.xml\"/>", rel.target));
+            } else {
+                s.push_str(&format!(
+                    "<Relationship Id=\"rId{actual_rid}\" \
+Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" \
+Target=\"{}\" TargetMode=\"External\"/>", rel.target));
+            }
+        }
+    }
+    for (i, rel) in rels_media.iter().enumerate() {
+        let actual_rid = rel.r_id + RID_OFFSET;
+        let target = media_targets.get(i).map(String::as_str).unwrap_or(&rel.target);
+        let type_uri = match rel.rel_type.as_str() {
+            "video" => "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video",
+            "audio" => "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio",
+            _ => "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+        };
+        s.push_str(&format!(
+            "<Relationship Id=\"rId{actual_rid}\" Type=\"{type_uri}\" Target=\"{target}\"/>"));
+    }
+    s.push_str("</Relationships>");
+    s
 }
 
 // ─────────────────────────────────────────────────────────────

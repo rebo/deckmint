@@ -55,17 +55,9 @@ pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
     add_file_str!("ppt/viewProps.xml", pres_xml::make_xml_view_props().as_bytes());
 
     // ── Slide layouts ────────────────────────────────────
-    for (idx, layout) in pres.slide_layouts.iter().enumerate() {
-        let n = idx + 1;
-        add_file!(
-            &format!("ppt/slideLayouts/slideLayout{n}.xml"),
-            pres_xml::make_xml_layout(layout)
-        );
-        add_file_str!(
-            &format!("ppt/slideLayouts/_rels/slideLayout{n}.xml.rels"),
-            rels_xml::make_xml_slide_layout_rel().as_bytes()
-        );
-    }
+    // XML + rels are written after media dedup below (each layout may embed
+    // its own chrome images, e.g. an archetype's icon), same reason the
+    // master's rels wait.
 
     // ── Slide master ─────────────────────────────────────
     add_file!("ppt/slideMasters/slideMaster1.xml", pres_xml::make_xml_master(pres));
@@ -77,7 +69,9 @@ pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
 
     // Pre-compute global sequential media targets with deduplication.
     // Media items with identical bytes reuse the same target path.
-    // Include master media first, then slide media.
+    // Order: master media, then each layout's media (in layout order), then
+    // slide media — layouts sit between master and slides in the anatomy, so
+    // their media does too.
     let mut global_media_idx = 0u32;
     let mut flat_media: Vec<&crate::objects::SlideRelMedia> = Vec::new();
     let master_media_count = if let Some(ref m) = pres.master {
@@ -86,6 +80,12 @@ pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
     } else {
         0
     };
+    let layout_media_counts: Vec<usize> = pres.slide_layouts.iter().map(|l| l.rels_media.len()).collect();
+    for layout in &pres.slide_layouts {
+        for media in &layout.rels_media {
+            flat_media.push(media);
+        }
+    }
     for slide in &pres.slides {
         for media in &slide.rels_media {
             flat_media.push(media);
@@ -109,9 +109,14 @@ pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
             media_target_for.push(format!("../media/{prefix}{global_media_idx}.{}", media.extn));
         }
     }
-    // Split master targets from slide targets
+    // Split master / per-layout / slide targets back out of the flat list.
     let master_media_targets: Vec<String> = media_target_for[..master_media_count].to_vec();
     let mut flat_idx = master_media_count;
+    let layout_media_targets: Vec<Vec<String>> = layout_media_counts.iter().map(|&count| {
+        let targets: Vec<String> = media_target_for[flat_idx..flat_idx + count].to_vec();
+        flat_idx += count;
+        targets
+    }).collect();
     let slide_media_targets: Vec<Vec<String>> = pres.slides.iter().map(|slide| {
         let targets: Vec<String> = slide.rels_media.iter().map(|_| {
             let t = media_target_for[flat_idx].clone();
@@ -134,6 +139,19 @@ pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
             rels_xml::make_xml_master_rel(layout_count, master_rels, master_rels_media, &master_media_targets, rid_offset));
     }
 
+    // ── Slide layouts (written here because we need layout_media_targets) ──
+    for (idx, layout) in pres.slide_layouts.iter().enumerate() {
+        let n = idx + 1;
+        add_file!(
+            &format!("ppt/slideLayouts/slideLayout{n}.xml"),
+            pres_xml::make_xml_layout(layout, pres)
+        );
+        add_file!(
+            &format!("ppt/slideLayouts/_rels/slideLayout{n}.xml.rels"),
+            rels_xml::make_xml_slide_layout_rel(&layout.rels, &layout.rels_media, &layout_media_targets[idx])
+        );
+    }
+
     // Pre-compute global sequential chart targets (chart1, chart2, … across all slides)
     let mut global_chart_idx = 0u32;
     let slide_chart_rels: Vec<Vec<(u32, String)>> = pres.slides.iter().map(|slide| {
@@ -146,7 +164,12 @@ pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
     // ── Slides ───────────────────────────────────────────
     for (idx, slide) in pres.slides.iter().enumerate() {
         let n = idx + 1;
-        let layout_idx = 1; // All slides use layout 1 (DEFAULT)
+        // 1-based slideLayoutN.xml file number this slide binds to — from
+        // `slide.layout_idx` (set by `Presentation::add_slide_with_layout`)
+        // when present, else the first-defined layout (`slide_layouts[0]`,
+        // "DEFAULT" unless overridden), matching `add_slide`'s old
+        // always-layout-1 behaviour.
+        let layout_idx = slide.layout_idx.map(|i| i + 1).unwrap_or(1);
 
         add_file!(&format!("ppt/slides/slide{n}.xml"), pres_xml::make_xml_slide(slide, pres));
         add_file!(
@@ -179,6 +202,19 @@ pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
     // Master media first
     if let Some(ref m) = pres.master {
         for media in &m.rels_media {
+            let target = &media_target_for[flat_idx2];
+            flat_idx2 += 1;
+            let zip_path = format!("ppt/{}", target.trim_start_matches("../"));
+            if written_paths.insert(zip_path.clone()) {
+                zip.start_file(&zip_path, opts).map_err(PptxError::Zip)?;
+                zip.write_all(&media.data).map_err(PptxError::Io)?;
+            }
+        }
+    }
+    // Layout media next (must match the flat_media ordering above: master,
+    // then layouts, then slides).
+    for layout in &pres.slide_layouts {
+        for media in &layout.rels_media {
             let target = &media_target_for[flat_idx2];
             flat_idx2 += 1;
             let zip_path = format!("ppt/{}", target.trim_start_matches("../"));

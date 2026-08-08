@@ -3,7 +3,7 @@ use deckmint::objects::shape::ShapeOptionsBuilder;
 use deckmint::objects::table::{TableCell, TableOptions, TableOptionsBuilder};
 use deckmint::objects::text::{TextOptionsBuilder, TextRun, TextRunOptions};
 use deckmint::types::{AnimationEffect, CheckerboardDir, Direction, HyperlinkProps, ShapeVariant, SplitOrientation, StripDir};
-use deckmint::{AlignH, Presentation, ShapeType};
+use deckmint::{AlignH, AlignV, Presentation, ShapeType};
 use std::io::Read;
 use zip::ZipArchive;
 
@@ -254,6 +254,36 @@ fn aligned_text() {
     let mut zip = open_zip(&bytes);
     let slide_xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
     assert!(slide_xml.contains("algn=\"ctr\""), "center align attribute expected");
+}
+
+#[test]
+fn shape_with_text_valign_emits_anchor_ctr() {
+    // Regression test for a bug where `TextOptionsBuilder::valign` was
+    // silently dropped from the emitted XML unless `.margin(...)` was ALSO
+    // called: `gen_xml_body_properties` only consulted `opts.valign` inside
+    // the branch gated on `opts.margin.is_some()`, so `.valign(Middle)` alone
+    // produced a bare `<a:bodyPr wrap="square" rtlCol="0"/>` with no `anchor`
+    // attribute at all — PowerPoint then defaulted to top-anchored text.
+    // Found via revision_atlas's deckgen, whose pedagogical-badge labels
+    // (added via `add_shape_with_text` with `.valign(AlignV::Middle)` and no
+    // `.margin()`) sat visibly low in their pill shapes.
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    slide.add_shape_with_text(
+        ShapeType::RoundRect,
+        ShapeOptionsBuilder::new().x(1.0).y(1.0).w(4.0).h(1.0).fill_color("4472C4").build(),
+        "Explanation",
+        TextOptionsBuilder::new()
+            .x(1.0).y(1.0).w(4.0).h(1.0)
+            .align(AlignH::Center)
+            .valign(AlignV::Middle)
+            .build(),
+    );
+
+    let bytes = pres.write().expect("write failed");
+    let mut zip = open_zip(&bytes);
+    let slide_xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
+    assert!(slide_xml.contains("anchor=\"ctr\""), "middle-valign shape text must emit anchor=\"ctr\", got: {slide_xml}");
 }
 
 #[test]

@@ -730,17 +730,25 @@ fn gen_xml_body_properties(opts: &TextOptions, is_table_cell: bool) -> String {
         if let Some(v) = bp.t_ins { s.push_str(&format!(" tIns=\"{v}\"")); }
         if let Some(v) = bp.r_ins { s.push_str(&format!(" rIns=\"{v}\"")); }
         if let Some(v) = bp.b_ins { s.push_str(&format!(" bIns=\"{v}\"")); }
-        if let Some(ref anchor) = bp.anchor { s.push_str(&format!(" anchor=\"{anchor}\"")); }
         if let Some(ref vert2) = bp.vert { s.push_str(&format!(" vert=\"{vert2}\"")); }
     } else if let Some(ref margin) = opts.margin {
         s.push_str(&format!(" lIns=\"{}\"", val_to_pts(margin.left())));
         s.push_str(&format!(" tIns=\"{}\"", val_to_pts(margin.top())));
         s.push_str(&format!(" rIns=\"{}\"", val_to_pts(margin.right())));
         s.push_str(&format!(" bIns=\"{}\"", val_to_pts(margin.bottom())));
-        // Vertical alignment
-        if let Some(ref valign) = opts.valign {
-            s.push_str(&format!(" anchor=\"{}\"", valign.as_ooxml()));
-        }
+    }
+
+    // Vertical anchor: an explicit `body_prop.anchor` override wins (it's the
+    // lower-level escape hatch); otherwise fall back to the typed
+    // `opts.valign` set via `TextOptionsBuilder::valign`. This used to live
+    // nested inside the `opts.margin` arm above, so `.valign(...)` alone
+    // (without also calling `.margin(...)`) was silently dropped from the
+    // emitted XML — no `anchor` attribute at all, so PowerPoint defaulted to
+    // top-anchored text instead of the requested alignment.
+    if let Some(anchor) = opts.body_prop.as_ref().and_then(|bp| bp.anchor.as_ref()) {
+        s.push_str(&format!(" anchor=\"{anchor}\""));
+    } else if let Some(ref valign) = opts.valign {
+        s.push_str(&format!(" anchor=\"{}\"", valign.as_ooxml()));
     }
 
     s.push_str(" rtlCol=\"0\"");

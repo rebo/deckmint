@@ -4,6 +4,15 @@ All notable changes to deckmint, deckmint-math, and deckmint-wasm.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- `deckmint-math`: `latex_to_omml` now repairs two `latex2mathml` 0.2.3 MathML serialisation bugs before parsing, so LaTeX containing a literal `<`/`&` (e.g. `x < 3`, `A \& B`) or a `\bigl(...\bigr)` sized-paren no longer fails with an "ill-formed document" XML error. `Node::Operator`/`Node::Letter`'s `Display` impls write unescaped characters into MathML text content, and `Node::SizedParen`'s `Display` impl closes `<mo …>` with a `</mro>` typo instead of `</mo>` — both are upstream bugs in the external `latex2mathml` crate (pinned to `"0.2"`), worked around internally in the new `xml_repair` module until they're fixed upstream. Found via a 10,348-span corpus sweep in a downstream consumer.
+- `deckmint`: corrected the `rect_radius` docstring, which claimed the radius was a fraction of the shape's shorter side. The implementation has always treated `r` as an **absolute** radius in inches, converted to the OOXML `adj` guide value against the shape's *longer* side (`adj = round(r * EMU * 100_000 / max(cx, cy))`), so the same `r` reused across differently-proportioned shapes produces a different apparent corner radius. Behaviour is unchanged — only the docs were wrong — but a regression test now pins the true formula.
+
+### Added
+- `deckmint`: `TextOptionsBuilder::underline(style)` sets a paragraph-level default underline style, mirroring the existing `.bold()`/`.italic()` pattern — a run only falls back to it when the run itself doesn't specify its own underline.
+
 ## [0.1.7] - 2026-05-09
 
 ### Fixed

@@ -896,7 +896,8 @@ pub fn gen_xml_text_run(run: &TextRun, para_opts: &TextOptions) -> String {
     if let Some(b) = bold { rpr_attrs.push_str(&format!(" b=\"{}\"", if b { 1 } else { 0 })); }
     let italic = run_opts.italic.or(para_opts.italic);
     if let Some(i) = italic { rpr_attrs.push_str(&format!(" i=\"{}\"", if i { 1 } else { 0 })); }
-    if let Some(ref u) = run_opts.underline { rpr_attrs.push_str(&format!(" u=\"{u}\"")); }
+    let underline = run_opts.underline.as_deref().or(para_opts.underline.as_deref());
+    if let Some(u) = underline { rpr_attrs.push_str(&format!(" u=\"{u}\"")); }
     if let Some(ref st) = run_opts.strike {
         let val = if st == "dbl" { "dblStrike" } else { "sngStrike" };
         rpr_attrs.push_str(&format!(" strike=\"{val}\""));

@@ -83,6 +83,36 @@ fn presentation_with_shapes() {
 }
 
 #[test]
+fn rect_radius_is_absolute_inches_scaled_against_longer_side() {
+    // Pins the true semantics documented on `ShapeOptionsBuilder::rect_radius`:
+    // `r` is an ABSOLUTE radius in inches, converted to the OOXML `adj` guide
+    // value as a fraction of the shape's *longer* side (max(cx, cy)), not a
+    // fraction of the shorter side as the docstring used to (incorrectly) say.
+    //
+    // adj = round(r * EMU * 100_000 / max(cx, cy))
+    //     = round(0.2 * 914_400 * 100_000 / max(4 * 914_400, 1 * 914_400))
+    //     = round(18_288_000_000 / 3_657_600)
+    //     = 5000
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    slide.add_shape(
+        ShapeType::RoundRect,
+        ShapeOptionsBuilder::new()
+            .x(0.0).y(0.0).w(4.0).h(1.0)
+            .rect_radius(0.2)
+            .build(),
+    );
+
+    let bytes = pres.write().expect("write failed");
+    let mut zip = open_zip(&bytes);
+    let slide_xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
+    assert!(
+        slide_xml.contains("<a:gd name=\"adj\" fmla=\"val 5000\"/>"),
+        "expected adj computed against the longer side (4in), got: {slide_xml}"
+    );
+}
+
+#[test]
 fn presentation_with_image() {
     // 1x1 red pixel PNG
     let png_bytes: Vec<u8> = vec![
@@ -408,6 +438,24 @@ fn text_underline_styles() {
     let s2_xml = read_entry(&mut zip, "ppt/slides/slide2.xml");
     assert!(s1_xml.contains("u=\"dbl\""), "double underline expected");
     assert!(s2_xml.contains("u=\"wavy\""), "wavy underline expected");
+}
+
+#[test]
+fn text_options_underline_is_default_for_runs_without_their_own() {
+    // `TextOptionsBuilder::underline` mirrors the existing `.bold()`/`.italic()`
+    // pattern: it sets a paragraph-level default that a run only falls back to
+    // when the run itself doesn't specify an underline style.
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    slide.add_text(
+        "inherits paragraph underline",
+        TextOptionsBuilder::new().x(1.0).y(1.0).w(8.0).h(1.0).underline("sng").build(),
+    );
+
+    let bytes = pres.write().expect("write failed");
+    let mut zip = open_zip(&bytes);
+    let xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
+    assert!(xml.contains("u=\"sng\""), "run should inherit the paragraph-level underline default");
 }
 
 #[test]

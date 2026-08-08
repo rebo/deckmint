@@ -142,6 +142,10 @@ pub struct TextOptions {
     pub bold: Option<bool>,
     /// Default italic setting for all runs that do not specify their own.
     pub italic: Option<bool>,
+    /// Default underline style for all runs that do not specify their own.
+    /// OOXML underline style, e.g. `"sng"` for basic underline (see
+    /// `TextRunOptions::underline` for the full value list).
+    pub underline: Option<String>,
     /// Whether text flows right-to-left.
     pub rtl_mode: bool,
     /// Line spacing in points (fixed spacing).
@@ -260,6 +264,7 @@ impl Default for TextOptions {
             color: None,
             bold: None,
             italic: None,
+            underline: None,
             rtl_mode: false,
             line_spacing: None,
             line_spacing_multiple: None,
@@ -422,6 +427,9 @@ impl TextOptionsBuilder {
     pub fn bold(mut self) -> Self { self.opts.bold = Some(true); self }
     /// Enable italic formatting as the default for all runs.
     pub fn italic(mut self) -> Self { self.opts.italic = Some(true); self }
+    /// Set the default underline style for all runs, e.g. `"sng"` for single
+    /// underline. See `TextRunOptions::underline` for the full value list.
+    pub fn underline(mut self, style: impl Into<String>) -> Self { self.opts.underline = Some(style.into()); self }
     /// Set horizontal text alignment.
     pub fn align(mut self, a: AlignH) -> Self { self.opts.align = Some(a); self }
     /// Set vertical text alignment.

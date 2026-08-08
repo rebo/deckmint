@@ -196,7 +196,23 @@ impl ShapeOptionsBuilder {
     pub fn flip_v(mut self) -> Self { self.opts.flip_v = true; self }
     /// Apply a drop shadow effect to the shape.
     pub fn shadow(mut self, s: ShadowProps) -> Self { self.opts.shadow = Some(s); self }
-    /// Set the corner radius in inches for rounded rectangles.
+    /// Set the corner radius, in inches, for rounded rectangles.
+    ///
+    /// `r` is an **absolute** radius in inches, not a fraction of the shape's
+    /// shorter side. It is converted to OOXML's `adj` guide value (range
+    /// 0–100000, expressed as a fraction of the shape's *longer* side —
+    /// `EMU` = 914,400 per inch):
+    ///
+    /// ```text
+    /// adj = round(r * EMU * 100_000 / max(cx, cy))
+    /// ```
+    ///
+    /// where `cx`/`cy` are the shape's width/height in EMU. Because the
+    /// denominator is `max(cx, cy)` rather than `min(cx, cy)`, the same `r`
+    /// produces a *smaller* apparent corner on a shape's shorter side than on
+    /// a square shape of the same longer-side length — e.g. `rect_radius(0.2)`
+    /// on a 4in × 1in rectangle rounds the corner using `max(4, 1) = 4in` as
+    /// the denominator, not `1in`.
     pub fn rect_radius(mut self, r: f64) -> Self { self.opts.rect_radius = Some(r); self }
     /// Attach a hyperlink activated on click.
     pub fn hyperlink(mut self, h: HyperlinkProps) -> Self { self.opts.hyperlink = Some(h); self }

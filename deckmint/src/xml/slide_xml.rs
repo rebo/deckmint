@@ -682,19 +682,22 @@ pub fn gen_xml_text_body_from_runs(
         s.push_str("<a:p>");
         // Paragraph properties
         s.push_str(&gen_xml_para_props(opts, false));
-        // Text runs
-        for run in para {
-            if run.text.is_empty() && run.field.is_none() && run.equation_omml.is_none() {
-                s.push_str("<a:endParaRPr lang=\"en-US\" dirty=\"0\"/>");
-            } else {
-                // Soft line break before this run if requested
-                if run.soft_break_before {
-                    s.push_str("<a:br><a:rPr lang=\"en-US\" dirty=\"0\"/></a:br>");
-                }
-                s.push_str(&gen_xml_text_run(run, opts));
+        // Text runs. An empty run writes nothing inline: a paragraph may hold only one
+        // <a:endParaRPr>, as its last child, or PowerPoint reports the file as needing repair.
+        let is_empty = |run: &&TextRun| run.text.is_empty() && run.field.is_none() && run.equation_omml.is_none();
+        for run in para.iter().filter(|r| !is_empty(r)) {
+            // Soft line break before this run if requested
+            if run.soft_break_before {
+                s.push_str("<a:br><a:rPr lang=\"en-US\" dirty=\"0\"/></a:br>");
             }
+            s.push_str(&gen_xml_text_run(run, opts));
         }
-        s.push_str("<a:endParaRPr lang=\"en-US\" dirty=\"0\"/>");
+        // A paragraph of only empty runs (a blank line) keeps the run's size, so the gap is the right height.
+        let blank_size = if para.iter().all(is_empty) { para.iter().find_map(|r| r.options.font_size.or(opts.font_size)) } else { None };
+        match blank_size {
+            Some(fs) => s.push_str(&format!("<a:endParaRPr lang=\"en-US\" sz=\"{}\" dirty=\"0\"/>", (fs * 100.0).round() as i64)),
+            None => s.push_str("<a:endParaRPr lang=\"en-US\" dirty=\"0\"/>"),
+        }
         s.push_str("</a:p>");
     }
 

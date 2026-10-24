@@ -55,6 +55,33 @@ fn presentation_with_text() {
 }
 
 #[test]
+fn empty_runs_leave_one_end_para_rpr_per_paragraph() {
+    // An empty run used only to end a line, and a blank line: each <a:p> may hold a single
+    // <a:endParaRPr>, as its last child, or PowerPoint offers to repair the file.
+    use deckmint::objects::text::TextRunBuilder;
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    slide.add_text_runs(
+        vec![
+            TextRunBuilder::new("first").build(),
+            TextRunBuilder::new("").break_line().build(),
+            TextRunBuilder::new("").font_size(20.0).break_line().build(),
+            TextRunBuilder::new("second").build(),
+        ],
+        TextOptionsBuilder::new().x(1.0).y(1.0).w(8.0).h(2.0).build(),
+    );
+    let bytes = pres.write().expect("write failed");
+    let mut zip = open_zip(&bytes);
+    let xml = read_entry(&mut zip, "ppt/slides/slide1.xml");
+    for p in xml.split("<a:p>").skip(1) {
+        let p = &p[..p.find("</a:p>").expect("closed paragraph")];
+        assert_eq!(p.matches("<a:endParaRPr").count(), 1, "one endParaRPr per paragraph: {p}");
+        assert!(p.trim_end().ends_with("/>") && p.rfind("<a:endParaRPr") > p.rfind("</a:r>"), "endParaRPr comes last: {p}");
+    }
+    assert!(xml.contains("<a:endParaRPr lang=\"en-US\" sz=\"2000\" dirty=\"0\"/>"), "a blank line keeps its run's size");
+}
+
+#[test]
 fn presentation_with_shapes() {
     let mut pres = Presentation::new();
     let slide = pres.add_slide();

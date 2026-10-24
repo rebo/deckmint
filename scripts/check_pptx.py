@@ -808,6 +808,27 @@ def check_underline_values(zf, names):
     ok(f"Underline values: checked {checked} attribute(s) across {len(slide_paths)} slide(s)")
 
 
+def check_end_para_rpr(zf, names):
+    """
+    Each <a:p> may hold at most one <a:endParaRPr>, and it must be the paragraph's last child.
+    deckmint up to 0.1.9 wrote one in place of every empty text run *and* another when closing the
+    paragraph, so a run like TextRun::new("") with break_line() made PowerPoint offer to repair the file.
+    """
+    xml_paths = sorted(n for n in names if re.match(r"ppt/(slides|slideLayouts|slideMasters|notesSlides)/[^/]+\.xml$", n))
+    checked = 0
+    for path in xml_paths:
+        xml = zf.read(path).decode("utf-8", errors="replace")
+        for k, m in enumerate(re.finditer(r"<a:p>(.*?)</a:p>", xml, re.S)):
+            body = m.group(1)
+            checked += 1
+            n = body.count("<a:endParaRPr")
+            if n > 1:
+                err(f"{path}: paragraph {k + 1} has {n} <a:endParaRPr> elements (at most one allowed)")
+            elif n == 1 and not re.search(r"<a:endParaRPr\b[^>]*(/>|>.*?</a:endParaRPr>)\s*$", body, re.S):
+                err(f"{path}: paragraph {k + 1} has <a:endParaRPr> before other content (it must come last)")
+    ok(f"endParaRPr: checked {checked} paragraph(s) across {len(xml_paths)} part(s)")
+
+
 def check_alpha_values(zf, names):
     """
     Validate that all <a:alpha val="N"/> values are in the valid OOXML range 0–100000.
@@ -996,6 +1017,7 @@ def main():
 
     # Alpha values out of OOXML range (0–100000)
     check_alpha_values(zf, names)
+    check_end_para_rpr(zf, names)
     print()
 
     zf.close()

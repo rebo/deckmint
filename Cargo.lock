@@ -95,7 +95,7 @@ dependencies = [
 
 [[package]]
 name = "deckmint-math"
-version = "0.1.7"
+version = "0.1.9"
 dependencies = [
  "latex2mathml",
  "quick-xml",

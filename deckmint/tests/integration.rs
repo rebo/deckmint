@@ -369,6 +369,84 @@ fn hyperlink_text_run_emits_hlinkclick() {
 }
 
 #[test]
+fn hyperlink_target_is_xml_escaped() {
+    let mut pres = Presentation::new();
+    let slide = pres.add_slide();
+    let injected = "https://example.test/?a=1&b=\"/><Relationship Id=\"injected\"";
+    slide.add_text_runs(
+        vec![TextRun {
+            text: "Safe link".to_string(),
+            options: TextRunOptions {
+                hyperlink: Some(HyperlinkProps::url(injected)),
+                ..Default::default()
+            },
+            break_line: false,
+            soft_break_before: false,
+            field: None,
+            equation_omml: None,
+        }],
+        TextOptionsBuilder::new().x(1.0).y(1.0).w(8.0).h(1.0).build(),
+    );
+
+    let bytes = pres.write().expect("write failed");
+    let mut zip = open_zip(&bytes);
+    let rels_xml = read_entry(&mut zip, "ppt/slides/_rels/slide1.xml.rels");
+
+    assert!(rels_xml.contains(
+        "Target=\"https://example.test/?a=1&amp;b=&quot;/&gt;&lt;Relationship Id=&quot;injected&quot;\""
+    ));
+    assert!(!rels_xml.contains("<Relationship Id=\"injected\""));
+}
+
+#[test]
+fn presentation_metadata_and_names_are_xml_escaped() {
+    use deckmint::{SlideMasterDef, ThemeProps};
+
+    let injected = "\"/><evil attr=\"";
+    let mut pres = Presentation::new()
+        .revision(injected)
+        .theme(ThemeProps {
+            head_font_face: Some(injected.to_string()),
+            body_font_face: Some(injected.to_string()),
+        });
+    pres.define_layout(injected, None, None);
+    let mut master = SlideMasterDef::new(injected);
+    master.set_background_color(injected);
+    pres.define_master(master);
+    pres.add_slide();
+
+    let bytes = pres.write().expect("write failed");
+    let mut zip = open_zip(&bytes);
+    for part in [
+        "docProps/core.xml",
+        "ppt/theme/theme1.xml",
+        "ppt/slideMasters/slideMaster1.xml",
+        "ppt/slideLayouts/slideLayout2.xml",
+    ] {
+        let xml = read_entry(&mut zip, part);
+        assert!(!xml.contains("<evil"), "raw injected element in {part}: {xml}");
+    }
+
+    let core = read_entry(&mut zip, "docProps/core.xml");
+    assert!(core.contains("<cp:revision>&quot;/&gt;&lt;evil attr=&quot;</cp:revision>"));
+    let master = read_entry(&mut zip, "ppt/slideMasters/slideMaster1.xml");
+    assert!(master.contains("<a:srgbClr val=\"000000\"/>"));
+}
+
+#[test]
+fn unsafe_media_extension_is_rejected() {
+    let mut pres = Presentation::new();
+    pres.add_slide().add_image(
+        Vec::new(),
+        "png/../../../../outside",
+        ImageOptionsBuilder::new().build_opts(),
+    );
+
+    let err = pres.write().expect_err("path-like media extension must be rejected");
+    assert!(matches!(err, deckmint::PptxError::InvalidArgument(_)));
+}
+
+#[test]
 fn hyperlink_slide_jump_emits_ppaction() {
     let mut pres = Presentation::new();
     let slide = pres.add_slide();
@@ -656,7 +734,7 @@ fn pptx_passes_ooxml_validation() {
     let path = "/tmp/deckmint_validate_test.pptx";
     std::fs::write(path, &bytes).unwrap();
     let output = std::process::Command::new("npx")
-        .args(["--yes", "@xarsh/ooxml-validator", path])
+        .args(["--yes", "@xarsh/ooxml-validator@0.4.0", path])
         .output()
         .expect("npx must be on PATH");
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -1810,7 +1888,7 @@ fn master_add_image_registers_media() {
     let bytes = pres.write().unwrap();
     let zip = open_zip(&bytes);
     let media_names: Vec<String> = (0..zip.len())
-        .map(|i| zip.name_for_index(i).unwrap().to_string())
+        .map(|i| zip.name_for_index(i).unwrap().unwrap().into_owned())
         .filter(|n| n.starts_with("ppt/media/"))
         .collect();
     assert!(!media_names.is_empty(), "master image should be in archive");
@@ -1867,7 +1945,7 @@ fn master_with_image_produces_valid_pptx() {
 
     // Verify media file exists in the archive
     let media_names: Vec<String> = (0..zip.len())
-        .map(|i| zip.name_for_index(i).unwrap().to_string())
+        .map(|i| zip.name_for_index(i).unwrap().unwrap().into_owned())
         .filter(|n| n.starts_with("ppt/media/"))
         .collect();
     assert!(!media_names.is_empty(), "media file should exist in archive: found {:?}", media_names);
@@ -1993,7 +2071,7 @@ fn layout_image_is_embedded_and_relationship_offset_by_one() {
     assert!(layout_rels.contains(r#"Id="rId2""#) && layout_rels.contains("relationships/image"), "rId2 must be the layout's own image relationship: {layout_rels}");
 
     let media_names: Vec<String> = (0..zip.len())
-        .map(|i| zip.name_for_index(i).unwrap().to_string())
+        .map(|i| zip.name_for_index(i).unwrap().unwrap().into_owned())
         .filter(|n| n.starts_with("ppt/media/"))
         .collect();
     assert!(!media_names.is_empty(), "layout's image bytes must be written into ppt/media/: found {:?}", media_names);
@@ -2070,7 +2148,7 @@ fn svg_image_registers_two_media_parts_with_correct_blip_pairing() {
 
     // Both media parts must exist as separate files.
     let media_names: Vec<String> = (0..zip.len())
-        .map(|i| zip.name_for_index(i).unwrap().to_string())
+        .map(|i| zip.name_for_index(i).unwrap().unwrap().into_owned())
         .filter(|n| n.starts_with("ppt/media/"))
         .collect();
     assert_eq!(media_names.len(), 2, "expected one PNG fallback + one SVG file, found {:?}", media_names);
@@ -2228,7 +2306,7 @@ fn svg_image_on_master_offsets_both_blip_rids() {
     assert!(rels.get("rId4").map_or(false, |(_, t)| t.ends_with(".svg")), "rId4 must be the SVG file: {master_rels}");
 
     let media_names: Vec<String> = (0..zip.len())
-        .map(|i| zip.name_for_index(i).unwrap().to_string())
+        .map(|i| zip.name_for_index(i).unwrap().unwrap().into_owned())
         .filter(|n| n.starts_with("ppt/media/"))
         .collect();
     assert_eq!(media_names.len(), 2, "master's SVG + PNG fallback must both be written: {:?}", media_names);

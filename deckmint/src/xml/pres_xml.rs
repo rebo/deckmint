@@ -198,7 +198,7 @@ xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\
         title = encode_xml_entities(title),
         subject = encode_xml_entities(subject),
         author = encode_xml_entities(author),
-        revision = revision,
+        revision = encode_xml_entities(revision),
         ts = ts,
     )
 }
@@ -384,10 +384,10 @@ xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">\
 
 pub fn make_xml_theme(head_font_face: Option<&str>, body_font_face: Option<&str>) -> String {
     let major = head_font_face
-        .map(|f| format!("<a:latin typeface=\"{f}\"/>"))
+        .map(|f| format!("<a:latin typeface=\"{}\"/>", encode_xml_entities(f)))
         .unwrap_or_else(|| "<a:latin typeface=\"Calibri Light\" panose=\"020F0302020204030204\"/>".to_string());
     let minor = body_font_face
-        .map(|f| format!("<a:latin typeface=\"{f}\"/>"))
+        .map(|f| format!("<a:latin typeface=\"{}\"/>", encode_xml_entities(f)))
         .unwrap_or_else(|| "<a:latin typeface=\"Calibri\" panose=\"020F0502020204030204\"/>".to_string());
 
     format!("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
@@ -494,20 +494,21 @@ xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" 
 xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">");
 
     // Background
-    let master_name = pres.master.as_ref().map(|m| m.title.as_str()).unwrap_or("DEFAULT");
+    let master_name = encode_xml_entities(
+        pres.master.as_ref().map(|m| m.title.as_str()).unwrap_or("DEFAULT")
+    );
     s.push_str(&format!("<p:cSld name=\"{master_name}\">"));
     if let Some(ref m) = pres.master {
         if let Some(ref bg_image_rid) = m.background_image_rid {
             let actual_rid = bg_image_rid + rid_offset;
             s.push_str(&format!("<p:bg><p:bgPr><a:blipFill><a:blip r:embed=\"rId{actual_rid}\"/><a:stretch><a:fillRect/></a:stretch></a:blipFill><a:effectLst/></p:bgPr></p:bg>"));
         } else if let Some(ref bg_color) = m.background_color {
-            let c = bg_color.trim_start_matches('#').to_uppercase();
-            if let Some(transparency) = m.background_transparency {
-                let alpha = ((100.0 - transparency) * 1000.0) as u32;
-                s.push_str(&format!("<p:bg><p:bgPr><a:solidFill><a:srgbClr val=\"{c}\"><a:alpha val=\"{alpha}\"/></a:srgbClr></a:solidFill><a:effectLst/></p:bgPr></p:bg>"));
-            } else {
-                s.push_str(&format!("<p:bg><p:bgPr><a:solidFill><a:srgbClr val=\"{c}\"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>"));
-            }
+            let alpha = m.background_transparency.map(|transparency| {
+                let value = ((100.0 - transparency) * 1000.0) as u32;
+                format!("<a:alpha val=\"{value}\"/>")
+            });
+            let color = crate::utils::create_color_element(bg_color, alpha.as_deref());
+            s.push_str(&format!("<p:bg><p:bgPr><a:solidFill>{color}</a:solidFill><a:effectLst/></p:bgPr></p:bg>"));
         } else {
             s.push_str("<p:bg><p:bgRef idx=\"1001\"><a:schemeClr val=\"bg1\"/></p:bgRef></p:bg>");
         }
@@ -567,7 +568,7 @@ xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">");
 // ─────────────────────────────────────────────────────────────
 
 pub fn make_xml_layout(layout: &SlideLayout, pres: &Presentation) -> String {
-    let name = &layout.name;
+    let name = encode_xml_entities(&layout.name);
     // Note: slide dimensions are presentation-level (p:sldSz in presentation.xml).
     // p:sldLayout does NOT support cx/cy attributes — layout.width/height are stored
     // for potential future use (e.g. informing presentation.xml) but not emitted here.

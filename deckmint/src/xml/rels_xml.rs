@@ -1,4 +1,5 @@
 use crate::objects::{SlideRel, SlideRelMedia};
+use crate::utils::encode_xml_entities;
 use crate::xml::CRLF;
 
 // ─────────────────────────────────────────────────────────────
@@ -95,14 +96,16 @@ Target=\"../notesSlides/notesSlide{slide_num}.xml\"/>"
                     "<Relationship Id=\"rId{}\" \
 Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" \
 Target=\"slide{}.xml\"/>",
-                    rel.r_id, rel.target
+                    rel.r_id,
+                    encode_xml_entities(&rel.target)
                 ));
             } else {
                 s.push_str(&format!(
                     "<Relationship Id=\"rId{}\" \
 Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" \
 Target=\"{}\" TargetMode=\"External\"/>",
-                    rel.r_id, rel.target
+                    rel.r_id,
+                    encode_xml_entities(&rel.target)
                 ));
             }
         }
@@ -167,12 +170,12 @@ Target=\"../slideMasters/slideMaster1.xml\"/>"
                 s.push_str(&format!(
                     "<Relationship Id=\"rId{actual_rid}\" \
 Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" \
-Target=\"../slides/slide{}.xml\"/>", rel.target));
+Target=\"../slides/slide{}.xml\"/>", encode_xml_entities(&rel.target)));
             } else {
                 s.push_str(&format!(
                     "<Relationship Id=\"rId{actual_rid}\" \
 Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" \
-Target=\"{}\" TargetMode=\"External\"/>", rel.target));
+Target=\"{}\" TargetMode=\"External\"/>", encode_xml_entities(&rel.target)));
             }
         }
     }
@@ -228,12 +231,12 @@ Target=\"../theme/theme1.xml\"/>"
                 s.push_str(&format!(
                     "<Relationship Id=\"rId{actual_rid}\" \
 Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" \
-Target=\"slide{}.xml\"/>", rel.target));
+Target=\"slide{}.xml\"/>", encode_xml_entities(&rel.target)));
             } else {
                 s.push_str(&format!(
                     "<Relationship Id=\"rId{actual_rid}\" \
 Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" \
-Target=\"{}\" TargetMode=\"External\"/>", rel.target));
+Target=\"{}\" TargetMode=\"External\"/>", encode_xml_entities(&rel.target)));
             }
         }
     }

@@ -1021,7 +1021,9 @@ pub struct HyperlinkProps {
     pub r_id: u32,
     /// Target slide number for an internal slide-jump link.
     pub slide: Option<u32>,
-    /// External URL (e.g. `"https://example.com"`).
+    /// External URL (e.g. `"https://example.com"`). Deckmint XML-escapes this
+    /// value but does not restrict URL schemes; applications accepting untrusted
+    /// links should apply their own scheme allowlist.
     pub url: Option<String>,
     /// Hover tooltip text.
     pub tooltip: Option<String>,

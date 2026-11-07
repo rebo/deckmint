@@ -6,9 +6,39 @@ use crate::error::PptxError;
 use crate::presentation::Presentation;
 use crate::xml::{chart_xml, pres_xml, rels_xml};
 
+const MAX_MEDIA_EXTENSION_LEN: usize = 16;
+
+fn validate_media_extension(extension: &str) -> Result<(), PptxError> {
+    if extension.is_empty()
+        || extension.len() > MAX_MEDIA_EXTENSION_LEN
+        || !extension.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    {
+        return Err(PptxError::InvalidArgument(format!(
+            "unsafe media extension {extension:?}: expected 1-{MAX_MEDIA_EXTENSION_LEN} ASCII letters or digits"
+        )));
+    }
+    Ok(())
+}
+
 /// Assembles the complete PPTX ZIP archive into an in-memory buffer.
 /// Follows the OOXML packaging convention for `.pptx` files.
 pub fn assemble_pptx(pres: &Presentation) -> Result<Vec<u8>, PptxError> {
+    if let Some(master) = &pres.master {
+        for media in &master.rels_media {
+            validate_media_extension(&media.extn)?;
+        }
+    }
+    for layout in &pres.slide_layouts {
+        for media in &layout.rels_media {
+            validate_media_extension(&media.extn)?;
+        }
+    }
+    for slide in &pres.slides {
+        for media in &slide.rels_media {
+            validate_media_extension(&media.extn)?;
+        }
+    }
+
     let buf = std::io::Cursor::new(Vec::new());
     let mut zip = ZipWriter::new(buf);
 

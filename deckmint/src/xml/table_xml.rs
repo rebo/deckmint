@@ -2,7 +2,7 @@ use crate::enums::EMU;
 use crate::objects::table::{TableObject, TableCell, CellTextRun};
 use crate::presentation::Presentation;
 use crate::types::{BorderType, PatternFill};
-use crate::utils::{encode_xml_entities, gen_xml_color_selection_str, inch_to_emu, val_to_pts};
+use crate::utils::{encode_xml_entities, gen_xml_color_selection_str, inch_to_emu, safe_hex_color, val_to_pts};
 
 /// Generate the full `<p:graphicFrame>` XML for a table
 pub fn gen_xml_table(
@@ -16,14 +16,17 @@ pub fn gen_xml_table(
     let cx = tbl.options.position.w.as_ref().map(|c| c.to_emu(layout.width)).unwrap_or(EMU);
     let cy = tbl.options.position.h.as_ref().map(|c| c.to_emu(layout.height)).unwrap_or(EMU);
 
-    let obj_name = tbl.options.object_name.as_deref().unwrap_or("Table 1");
+    let obj_name = encode_xml_entities(tbl.options.object_name.as_deref().unwrap_or("Table 1"));
     let frame_id = obj_id;
 
     // Count columns from first row (accounting for colspan)
     let col_count = count_columns(&tbl.rows);
 
     let tbl_pr = if let Some(ref style_id) = tbl.options.table_style_id {
-        format!("<a:tblPr><a:tableStyleId>{style_id}</a:tableStyleId></a:tblPr>")
+        format!(
+            "<a:tblPr><a:tableStyleId>{}</a:tableStyleId></a:tblPr>",
+            encode_xml_entities(style_id)
+        )
     } else {
         "<a:tblPr/>".to_string()
     };
@@ -173,6 +176,7 @@ fn gen_xml_table_cell(
 
                 let ff = run.font_face.as_deref().or(cell.options.font_face.as_deref()).or(tbl.options.font_face.as_deref());
                 if let Some(f) = ff {
+                    let f = encode_xml_entities(f);
                     rpr_children.push_str(&format!(
                         "<a:latin typeface=\"{f}\" pitchFamily=\"34\" charset=\"0\"/>"
                     ));
@@ -293,8 +297,8 @@ fn gen_xml_table_cell(
 
 fn gen_xml_pattern_fill(pf: &PatternFill) -> String {
     let prst = pf.pattern.as_str();
-    let fg = pf.fg_color.trim_start_matches('#').to_uppercase();
-    let bg = pf.bg_color.trim_start_matches('#').to_uppercase();
+    let fg = safe_hex_color(&pf.fg_color);
+    let bg = safe_hex_color(&pf.bg_color);
     format!(
         "<a:pattFill prst=\"{prst}\">\
 <a:fgClr><a:srgbClr val=\"{fg}\"/></a:fgClr>\

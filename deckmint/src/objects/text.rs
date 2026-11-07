@@ -27,6 +27,9 @@ pub struct TextRun {
     pub field: Option<FieldType>,
     /// Pre-rendered OMML equation XML (the `<a14:m>` element). When set, this run
     /// renders as an inline equation instead of a normal text run.
+    ///
+    /// This value is inserted verbatim. Do not populate it from untrusted input;
+    /// prefer [`TextRun::equation`] when possible.
     pub equation_omml: Option<String>,
 }
 

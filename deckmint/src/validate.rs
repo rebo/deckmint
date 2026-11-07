@@ -32,6 +32,11 @@ pub struct ValidationIssue {
 ///
 /// Returns a list of issues found. An empty list means the archive passes
 /// all structural checks.
+///
+/// This is a structural check for Deckmint-generated output, not a security
+/// validator for uploaded files. It does not impose decompressed-size limits;
+/// callers must not pass an untrusted archive without enforcing their own
+/// entry-count and size limits first.
 pub fn validate(pptx_bytes: &[u8]) -> Vec<ValidationIssue> {
     let mut issues = Vec::new();
 
@@ -50,7 +55,12 @@ pub fn validate(pptx_bytes: &[u8]) -> Vec<ValidationIssue> {
 
     // Collect all entry names
     let entry_names: HashSet<String> = (0..archive.len())
-        .filter_map(|i| archive.by_index(i).ok().map(|f| f.name().to_string()))
+        .filter_map(|i| {
+            archive
+                .by_index(i)
+                .ok()
+                .and_then(|f| f.name().ok().map(|name| name.into_owned()))
+        })
         .collect();
 
     // Check 1: presentation.xml exists

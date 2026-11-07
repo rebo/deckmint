@@ -9,5 +9,5 @@ readme = "README.md"
 
 [dependencies]
 latex2mathml = "0.2"
-quick-xml = "0.37"
+quick-xml = "0.41"
 regex = "1"

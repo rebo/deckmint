@@ -12,6 +12,7 @@ use std::collections::HashMap;
 
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
+use quick_xml::XmlVersion;
 
 use elements::{make_run_style, OmmlNode, RunKind, RunStyle};
 use op_dict::{op_lookup, OpAttrs as DictOpAttrs, OpForm};
@@ -1253,8 +1254,10 @@ pub fn convert(mathml: &str) -> Result<String, MathError> {
                 builder.end_element(&name)?;
             }
             Ok(Event::Text(ref e)) => {
-                let text = e
-                    .unescape()
+                let decoded = e
+                    .decode()
+                    .map_err(|err| MathError::Xml(err.to_string()))?;
+                let text = quick_xml::escape::unescape(&decoded)
                     .map_err(|err| MathError::Xml(err.to_string()))?;
                 builder.characters(&text);
             }
@@ -1267,6 +1270,15 @@ pub fn convert(mathml: &str) -> Result<String, MathError> {
             }
             Ok(Event::CData(ref e)) => {
                 let text = String::from_utf8_lossy(e.as_ref());
+                builder.characters(&text);
+            }
+            Ok(Event::GeneralRef(ref e)) => {
+                let reference = e
+                    .decode()
+                    .map_err(|err| MathError::Xml(err.to_string()))?;
+                let encoded = format!("&{reference};");
+                let text = quick_xml::escape::unescape(&encoded)
+                    .map_err(|err| MathError::Xml(err.to_string()))?;
                 builder.characters(&text);
             }
             Err(e) => return Err(MathError::Xml(format!("{}", e))),
@@ -1295,7 +1307,7 @@ fn collect_attrs(e: &quick_xml::events::BytesStart<'_>) -> Result<HashMap<String
         let attr = attr.map_err(|err| MathError::Xml(format!("attr error: {}", err)))?;
         let key = local_name(attr.key.as_ref());
         let val = attr
-            .unescape_value()
+            .normalized_value(XmlVersion::Implicit1_0)
             .map_err(|err| MathError::Xml(err.to_string()))?;
         map.insert(key, val.to_string());
     }

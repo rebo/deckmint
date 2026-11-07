@@ -7,7 +7,7 @@ use crate::slide::Slide;
 use crate::types::{AnimationEffectType, CheckerboardDir, Direction, FillType, PatternFill, ShadowType, ShapeVariant, SplitOrientation, StripDir, TransitionDir};
 use crate::utils::{
     convert_rotation_degrees, create_glow_element, encode_xml_entities,
-    gen_xml_color_selection_str, inch_to_emu, val_to_pts,
+    gen_xml_color_selection_str, inch_to_emu, safe_hex_color, val_to_pts,
 };
 use crate::xml::table_xml::gen_xml_table;
 
@@ -28,7 +28,7 @@ pub fn gen_xml_objects(objects: &[SlideObject], pres: &Presentation) -> String {
 /// Generate a fallback text object with equations stripped (for mc:Fallback).
 fn gen_xml_text_object_fallback(t: &TextObject, obj_id: usize, pres: &Presentation) -> String {
     let (x, y, cx, cy) = resolve_position(&t.options.position, pres);
-    let obj_name = &t.object_name;
+    let obj_name = encode_xml_entities(&t.object_name);
     let mut s = String::new();
     s.push_str("<p:sp>");
     s.push_str(&format!(
@@ -163,7 +163,7 @@ fn render_slide_object(obj: &SlideObject, id_counter: &mut usize, pres: &Present
 fn gen_xml_text_object(t: &TextObject, obj_id: usize, pres: &Presentation) -> String {
     let (x, y, cx, cy) = resolve_position(&t.options.position, pres);
     let location_attr = build_location_attr(t.options.rotate, t.options.flip_h, t.options.flip_v);
-    let obj_name = &t.object_name;
+    let obj_name = encode_xml_entities(&t.object_name);
 
     let mut s = String::new();
     s.push_str("<p:sp>");
@@ -220,7 +220,7 @@ fn gen_xml_shape_object(sh: &ShapeObject, obj_id: usize, pres: &Presentation) ->
         sh.options.flip_h,
         sh.options.flip_v,
     );
-    let obj_name = &sh.object_name;
+    let obj_name = encode_xml_entities(&sh.object_name);
     let shape_prst = sh.shape_type.as_str();
 
     let mut s = String::new();
@@ -372,7 +372,7 @@ fn gen_xml_image_object(img: &ImageObject, obj_id: usize, pres: &Presentation) -
     let (x, y, cx, cy) = resolve_position(&img.options.position, pres);
     let mut img_w = cx;
     let mut img_h = cy;
-    let obj_name = &img.object_name;
+    let obj_name = encode_xml_entities(&img.object_name);
     let alt_text = encode_xml_entities(img.options.alt_text.as_deref().unwrap_or(""));
     let rid = img.image_rid;
 
@@ -546,7 +546,7 @@ fn image_sizing_xml(
 
 fn gen_xml_group_object(g: &GroupObject, obj_id: usize, id_counter: &mut usize, pres: &Presentation) -> String {
     let (x, y, cx, cy) = resolve_position(&g.position, pres);
-    let obj_name = &g.object_name;
+    let obj_name = encode_xml_entities(&g.object_name);
     let (ch_off_x, ch_off_y) = g.child_offset;
     let (ch_ext_cx, ch_ext_cy) = g.child_extent;
 
@@ -587,8 +587,8 @@ fn gen_xml_group_object(g: &GroupObject, obj_id: usize, id_counter: &mut usize, 
 
 fn gen_xml_media_object(m: &MediaObject, obj_id: usize, pres: &Presentation) -> String {
     let (x, y, cx, cy) = resolve_position(&m.options.position, pres);
-    let obj_name = &m.object_name;
-    let alt_text = m.options.alt_text.as_deref().unwrap_or("");
+    let obj_name = encode_xml_entities(&m.object_name);
+    let alt_text = encode_xml_entities(m.options.alt_text.as_deref().unwrap_or(""));
     let media_rid = m.media_rid;
 
     let mut s = String::new();
@@ -745,7 +745,7 @@ fn gen_xml_body_properties(opts: &TextOptions, is_table_cell: bool) -> String {
 
     // Text direction (vert attribute)
     if let Some(ref vert) = opts.vert {
-        s.push_str(&format!(" vert=\"{vert}\""));
+        s.push_str(&format!(" vert=\"{}\"", encode_xml_entities(vert)));
     }
 
     // Margins (from body_prop or opts.margin)
@@ -754,7 +754,9 @@ fn gen_xml_body_properties(opts: &TextOptions, is_table_cell: bool) -> String {
         if let Some(v) = bp.t_ins { s.push_str(&format!(" tIns=\"{v}\"")); }
         if let Some(v) = bp.r_ins { s.push_str(&format!(" rIns=\"{v}\"")); }
         if let Some(v) = bp.b_ins { s.push_str(&format!(" bIns=\"{v}\"")); }
-        if let Some(ref vert2) = bp.vert { s.push_str(&format!(" vert=\"{vert2}\"")); }
+        if let Some(ref vert2) = bp.vert {
+            s.push_str(&format!(" vert=\"{}\"", encode_xml_entities(vert2)));
+        }
     } else if let Some(ref margin) = opts.margin {
         s.push_str(&format!(" lIns=\"{}\"", val_to_pts(margin.left())));
         s.push_str(&format!(" tIns=\"{}\"", val_to_pts(margin.top())));
@@ -770,7 +772,7 @@ fn gen_xml_body_properties(opts: &TextOptions, is_table_cell: bool) -> String {
     // emitted XML — no `anchor` attribute at all, so PowerPoint defaulted to
     // top-anchored text instead of the requested alignment.
     if let Some(anchor) = opts.body_prop.as_ref().and_then(|bp| bp.anchor.as_ref()) {
-        s.push_str(&format!(" anchor=\"{anchor}\""));
+        s.push_str(&format!(" anchor=\"{}\"", encode_xml_entities(anchor)));
     } else if let Some(ref valign) = opts.valign {
         s.push_str(&format!(" anchor=\"{}\"", valign.as_ooxml()));
     }
@@ -855,12 +857,16 @@ fn gen_xml_para_props(opts: &TextOptions, _is_default: bool) -> String {
                 }
                 BulletType::Numbered => {
                     let style = bullet.style.as_deref().unwrap_or("arabicPeriod");
+                    let style = encode_xml_entities(style);
                     let start = bullet.number_start_at.unwrap_or(1);
                     s.push_str(&format!("<a:buSzPct val=\"100000\"/><a:buFont typeface=\"+mj-lt\"/><a:buAutoNum type=\"{style}\" startAt=\"{start}\"/>"));
                 }
                 BulletType::Character => {
                     if let Some(ref code) = bullet.character_code {
-                        s.push_str(&format!("<a:buSzPct val=\"100000\"/><a:buChar char=\"&#{code};\"/>"));
+                        s.push_str(&format!(
+                            "<a:buSzPct val=\"100000\"/><a:buChar char=\"&#{};\"/>",
+                            encode_xml_entities(code)
+                        ));
                     }
                 }
             }
@@ -876,7 +882,7 @@ fn gen_xml_para_props(opts: &TextOptions, _is_default: bool) -> String {
             s.push_str("<a:tabLst>");
             for stop in stops {
                 let pos = inch_to_emu(stop.pos_inches);
-                let algn = &stop.align;
+                let algn = encode_xml_entities(&stop.align);
                 s.push_str(&format!("<a:tab pos=\"{pos}\" algn=\"{algn}\"/>"));
             }
             s.push_str("</a:tabLst>");
@@ -917,7 +923,7 @@ pub fn gen_xml_text_run(run: &TextRun, para_opts: &TextOptions) -> String {
     s.push_str("<a:r>");
 
     // Build <a:rPr> attributes
-    let lang = run_opts.lang.as_deref().unwrap_or("en-US");
+    let lang = encode_xml_entities(run_opts.lang.as_deref().unwrap_or("en-US"));
     let mut rpr_attrs = format!("<a:rPr lang=\"{lang}\"");
 
     let font_size = run_opts.font_size.or(para_opts.font_size);
@@ -929,7 +935,9 @@ pub fn gen_xml_text_run(run: &TextRun, para_opts: &TextOptions) -> String {
     let italic = run_opts.italic.or(para_opts.italic);
     if let Some(i) = italic { rpr_attrs.push_str(&format!(" i=\"{}\"", if i { 1 } else { 0 })); }
     let underline = run_opts.underline.as_deref().or(para_opts.underline.as_deref());
-    if let Some(u) = underline { rpr_attrs.push_str(&format!(" u=\"{u}\"")); }
+    if let Some(u) = underline {
+        rpr_attrs.push_str(&format!(" u=\"{}\"", encode_xml_entities(u)));
+    }
     if let Some(ref st) = run_opts.strike {
         let val = if st == "dbl" { "dblStrike" } else { "sngStrike" };
         rpr_attrs.push_str(&format!(" strike=\"{val}\""));
@@ -952,11 +960,11 @@ pub fn gen_xml_text_run(run: &TextRun, para_opts: &TextOptions) -> String {
 
     if let Some(ref outline) = run_opts.outline {
         let w = val_to_pts(outline.size);
-        let c = outline.color.trim_start_matches('#').to_uppercase();
+        let c = safe_hex_color(&outline.color);
         rpr_children.push_str(&format!("<a:ln w=\"{w}\"><a:solidFill><a:srgbClr val=\"{c}\"/></a:solidFill></a:ln>"));
     }
     if let Some(ref uc) = run_opts.underline_color {
-        let c = uc.trim_start_matches('#').to_uppercase();
+        let c = safe_hex_color(uc);
         rpr_children.push_str(&format!("<a:uFill><a:solidFill><a:srgbClr val=\"{c}\"/></a:solidFill></a:uFill>"));
     }
     let color = run_opts.color.as_deref().or(para_opts.color.as_deref());
@@ -974,11 +982,12 @@ pub fn gen_xml_text_run(run: &TextRun, para_opts: &TextOptions) -> String {
             create_glow_element(glow.size, &glow.color, glow.opacity)));
     }
     if let Some(ref hl_color) = run_opts.highlight {
-        let c = hl_color.trim_start_matches('#').to_uppercase();
+        let c = safe_hex_color(hl_color);
         rpr_children.push_str(&format!("<a:highlight><a:srgbClr val=\"{c}\"/></a:highlight>"));
     }
     let font_face = run_opts.font_face.as_deref().or(para_opts.font_face.as_deref());
     if let Some(ff) = font_face {
+        let ff = encode_xml_entities(ff);
         rpr_children.push_str(&format!(
             "<a:latin typeface=\"{ff}\" pitchFamily=\"34\" charset=\"0\"/>\
 <a:ea typeface=\"{ff}\" pitchFamily=\"34\" charset=\"-122\"/>\
@@ -1046,6 +1055,7 @@ fn gen_xml_slide_number(sn: &crate::types::SlideNumberProps, obj_id: usize, pres
         rpr_children.push_str(&gen_xml_color_selection_str(c, None));
     }
     if let Some(ref ff) = sn.font_face {
+        let ff = encode_xml_entities(ff);
         rpr_children.push_str(&format!(
             "<a:latin typeface=\"{ff}\" pitchFamily=\"34\" charset=\"0\"/>"
         ));
@@ -1057,7 +1067,9 @@ fn gen_xml_slide_number(sn: &crate::types::SlideNumberProps, obj_id: usize, pres
         format!("{rpr_attrs}>{rpr_children}</a:rPr>")
     };
 
-    let align_attr = sn.align.as_deref().map(|a| format!(" algn=\"{a}\"")).unwrap_or_default();
+    let align_attr = sn.align.as_deref()
+        .map(|a| format!(" algn=\"{}\"", encode_xml_entities(a)))
+        .unwrap_or_default();
 
     format!(
         "<p:sp>\
@@ -1168,7 +1180,7 @@ fn gen_xml_shape_line(line: &crate::types::ShapeLineProps) -> String {
         s.push_str(&gen_xml_color_selection_str(color, line.transparency));
     }
     if let Some(ref dash) = line.dash_type {
-        s.push_str(&format!("<a:prstDash val=\"{dash}\"/>"));
+        s.push_str(&format!("<a:prstDash val=\"{}\"/>", encode_xml_entities(dash)));
     }
     // Line join style
     match line.join {
@@ -1178,10 +1190,10 @@ fn gen_xml_shape_line(line: &crate::types::ShapeLineProps) -> String {
         None => {}
     }
     if let Some(ref arrow) = line.begin_arrow_type {
-        s.push_str(&format!("<a:headEnd type=\"{arrow}\"/>"));
+        s.push_str(&format!("<a:headEnd type=\"{}\"/>", encode_xml_entities(arrow)));
     }
     if let Some(ref arrow) = line.end_arrow_type {
-        s.push_str(&format!("<a:tailEnd type=\"{arrow}\"/>"));
+        s.push_str(&format!("<a:tailEnd type=\"{}\"/>", encode_xml_entities(arrow)));
     }
     s.push_str("</a:ln>");
     s
@@ -1211,7 +1223,7 @@ fn gen_xml_connector_object(c: &ConnectorObject, obj_id: usize, pres: &Presentat
     let flip_v = if y2 < y1 { " flipV=\"1\"" } else { "" };
 
     let prst = c.connector_type.as_prst();
-    let obj_name = &c.object_name;
+    let obj_name = encode_xml_entities(&c.object_name);
 
     // Optional connection site elements
     let st_cxn = if let Some(ref ep) = c.options.start_conn {
@@ -1252,13 +1264,13 @@ fn gen_xml_connector_object(c: &ConnectorObject, obj_id: usize, pres: &Presentat
             s.push_str(&gen_xml_color_selection_str(color, line.transparency));
         }
         if let Some(ref dash) = line.dash_type {
-            s.push_str(&format!("<a:prstDash val=\"{dash}\"/>"));
+            s.push_str(&format!("<a:prstDash val=\"{}\"/>", encode_xml_entities(dash)));
         }
         if let Some(ref arrow) = line.begin_arrow_type {
-            s.push_str(&format!("<a:headEnd type=\"{arrow}\"/>"));
+            s.push_str(&format!("<a:headEnd type=\"{}\"/>", encode_xml_entities(arrow)));
         }
         if let Some(ref arrow) = line.end_arrow_type {
-            s.push_str(&format!("<a:tailEnd type=\"{arrow}\"/>"));
+            s.push_str(&format!("<a:tailEnd type=\"{}\"/>", encode_xml_entities(arrow)));
         }
         s.push_str("</a:ln>");
     }
@@ -1405,8 +1417,8 @@ pub fn gen_xml_transition(slide: &Slide) -> String {
 
 fn gen_xml_pattern_fill(pf: &PatternFill) -> String {
     let prst = pf.pattern.as_str();
-    let fg = pf.fg_color.trim_start_matches('#').to_uppercase();
-    let bg = pf.bg_color.trim_start_matches('#').to_uppercase();
+    let fg = safe_hex_color(&pf.fg_color);
+    let bg = safe_hex_color(&pf.bg_color);
     format!(
         "<a:pattFill prst=\"{prst}\">\
 <a:fgClr><a:srgbClr val=\"{fg}\"/></a:fgClr>\
@@ -1427,7 +1439,7 @@ fn gen_xml_shadow(shadow: &crate::types::ShadowProps) -> String {
     // Normalise: if caller passed a percentage (e.g. 25.0 meaning 25%), convert to 0‑1.
     let norm = if raw_opacity > 1.0 { raw_opacity / 100.0 } else { raw_opacity };
     let opacity = (norm.clamp(0.0, 1.0) * 100_000.0).round() as i64;
-    let color = shadow.color.as_deref().unwrap_or("000000");
+    let color = safe_hex_color(shadow.color.as_deref().unwrap_or("000000"));
 
     let type_tag = match shadow.shadow_type {
         ShadowType::Outer => "outerShdw",
@@ -1509,6 +1521,7 @@ fn gen_xml_sp3d(sp3d: &crate::types::Shape3DProps) -> String {
         s.push_str(&format!("<a:bevelB w=\"{w}\" h=\"{h}\" prst=\"{}\"/>", bevel.preset.as_str()));
     }
     if let Some(ref color) = sp3d.contour_color {
+        let color = safe_hex_color(color);
         s.push_str(&format!("<a:contourClr><a:srgbClr val=\"{color}\"/></a:contourClr>"));
     }
 
@@ -2561,6 +2574,7 @@ fn anim_rot_xml(spid: usize, id: usize, by_units: i64, dur: u32) -> String {
 /// `auto_rev=true` pulses back to the original after reaching the target.
 fn anim_clr_to_xml(spid: usize, id: usize, attr: &str, hex: &str, dur: u32, auto_rev: bool) -> String {
     let ar = if auto_rev { " autoRev=\"1\"" } else { "" };
+    let hex = safe_hex_color(hex);
     // <p:to> in CT_TLAnimateColorBehavior takes a bare color element (not CT_TLAnimVariant)
     format!("<p:animClr clrSpc=\"rgb\" dir=\"cw\">\
 <p:cBhvr>\

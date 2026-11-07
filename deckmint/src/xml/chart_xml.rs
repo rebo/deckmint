@@ -1,6 +1,6 @@
 use crate::enums::ChartType;
 use crate::objects::chart::{BarDir, BarGrouping, ChartObject, ChartSeries, DEFAULT_CHART_COLORS};
-use crate::utils::encode_xml_entities;
+use crate::utils::{encode_xml_entities, safe_hex_color};
 
 /// Chart-level data labels block (all-off defaults). Required inside every
 /// chart element after the series, before <c:axId> or <c:firstSliceAng>.
@@ -163,10 +163,12 @@ fn gen_xml_bar_chart(chart: &ChartObject) -> String {
 }
 
 fn gen_xml_bar_series(ser: &ChartSeries, idx: usize, chart_colors: &[String], show_val: bool) -> String {
-    let color = ser.color.as_deref()
-        .or_else(|| chart_colors.get(idx).map(|s| s.as_str()))
-        .or_else(|| DEFAULT_CHART_COLORS.get(idx % DEFAULT_CHART_COLORS.len()).copied())
-        .unwrap_or("4472C4");
+    let color = safe_hex_color(
+        ser.color.as_deref()
+            .or_else(|| chart_colors.get(idx).map(|s| s.as_str()))
+            .or_else(|| DEFAULT_CHART_COLORS.get(idx % DEFAULT_CHART_COLORS.len()).copied())
+            .unwrap_or("4472C4"),
+    );
 
     let mut s = format!(
         "<c:ser>\
@@ -217,10 +219,12 @@ fn gen_xml_line_chart(chart: &ChartObject) -> String {
 }
 
 fn gen_xml_line_series(ser: &ChartSeries, idx: usize, chart_colors: &[String], show_val: bool, smooth: bool, markers: bool) -> String {
-    let color = ser.color.as_deref()
-        .or_else(|| chart_colors.get(idx).map(|s| s.as_str()))
-        .or_else(|| DEFAULT_CHART_COLORS.get(idx % DEFAULT_CHART_COLORS.len()).copied())
-        .unwrap_or("4472C4");
+    let color = safe_hex_color(
+        ser.color.as_deref()
+            .or_else(|| chart_colors.get(idx).map(|s| s.as_str()))
+            .or_else(|| DEFAULT_CHART_COLORS.get(idx % DEFAULT_CHART_COLORS.len()).copied())
+            .unwrap_or("4472C4"),
+    );
 
     let smooth_val = if smooth { "1" } else { "0" };
     let marker = if markers {
@@ -285,9 +289,11 @@ fn gen_xml_pie_series(ser: &ChartSeries, idx: usize, chart_colors: &[String], sh
     s.push_str(&gen_xml_ser_title(&ser.name));
     // Individual data point colors
     for (pt_idx, _) in ser.values.iter().enumerate() {
-        let color = chart_colors.get(pt_idx).map(|c| c.as_str())
-            .or_else(|| DEFAULT_CHART_COLORS.get(pt_idx % DEFAULT_CHART_COLORS.len()).copied())
-            .unwrap_or("4472C4");
+        let color = safe_hex_color(
+            chart_colors.get(pt_idx).map(|c| c.as_str())
+                .or_else(|| DEFAULT_CHART_COLORS.get(pt_idx % DEFAULT_CHART_COLORS.len()).copied())
+                .unwrap_or("4472C4"),
+        );
         s.push_str(&format!(
             "<c:dPt><c:idx val=\"{pt_idx}\"/><c:bubble3D val=\"0\"/>\
 <c:spPr><a:solidFill><a:srgbClr val=\"{color}\"/></a:solidFill>\
@@ -342,10 +348,12 @@ fn gen_xml_area_chart(chart: &ChartObject) -> String {
 <c:varyColors val=\"0\"/>"
     );
     for (idx, ser) in chart.series.iter().enumerate() {
-        let color = ser.color.as_deref()
-            .or_else(|| opts.chart_colors.get(idx).map(|s| s.as_str()))
-            .or_else(|| DEFAULT_CHART_COLORS.get(idx % DEFAULT_CHART_COLORS.len()).copied())
-            .unwrap_or("4472C4");
+        let color = safe_hex_color(
+            ser.color.as_deref()
+                .or_else(|| opts.chart_colors.get(idx).map(|s| s.as_str()))
+                .or_else(|| DEFAULT_CHART_COLORS.get(idx % DEFAULT_CHART_COLORS.len()).copied())
+                .unwrap_or("4472C4"),
+        );
 
         let mut ss = format!(
             "<c:ser>\
@@ -382,10 +390,12 @@ fn gen_xml_scatter_chart(chart: &ChartObject) -> String {
 <c:varyColors val=\"0\"/>"
     );
     for (idx, ser) in chart.series.iter().enumerate() {
-        let color = ser.color.as_deref()
-            .or_else(|| opts.chart_colors.get(idx).map(|s| s.as_str()))
-            .or_else(|| DEFAULT_CHART_COLORS.get(idx % DEFAULT_CHART_COLORS.len()).copied())
-            .unwrap_or("4472C4");
+        let color = safe_hex_color(
+            ser.color.as_deref()
+                .or_else(|| opts.chart_colors.get(idx).map(|s| s.as_str()))
+                .or_else(|| DEFAULT_CHART_COLORS.get(idx % DEFAULT_CHART_COLORS.len()).copied())
+                .unwrap_or("4472C4"),
+        );
 
         let mut ss = format!(
             "<c:ser>\
@@ -581,10 +591,12 @@ fn gen_xml_bubble_chart(chart: &ChartObject) -> String {
     s.push_str("<c:varyColors val=\"0\"/>");
 
     for (idx, ser) in chart.series.iter().enumerate() {
-        let color = ser.color.as_deref()
-            .or_else(|| opts.chart_colors.get(idx).map(|s| s.as_str()))
-            .or_else(|| DEFAULT_CHART_COLORS.get(idx % DEFAULT_CHART_COLORS.len()).copied())
-            .unwrap_or("4472C4");
+        let color = safe_hex_color(
+            ser.color.as_deref()
+                .or_else(|| opts.chart_colors.get(idx).map(|s| s.as_str()))
+                .or_else(|| DEFAULT_CHART_COLORS.get(idx % DEFAULT_CHART_COLORS.len()).copied())
+                .unwrap_or("4472C4"),
+        );
 
         s.push_str(&format!("<c:ser><c:idx val=\"{idx}\"/><c:order val=\"{idx}\"/>"));
         s.push_str(&gen_xml_ser_title(&ser.name));
@@ -681,10 +693,12 @@ fn gen_xml_surface_chart(chart: &ChartObject) -> String {
     }
 
     for (idx, ser) in chart.series.iter().enumerate() {
-        let color = ser.color.as_deref()
-            .or_else(|| opts.chart_colors.get(idx).map(|s| s.as_str()))
-            .or_else(|| DEFAULT_CHART_COLORS.get(idx % DEFAULT_CHART_COLORS.len()).copied())
-            .unwrap_or("4472C4");
+        let color = safe_hex_color(
+            ser.color.as_deref()
+                .or_else(|| opts.chart_colors.get(idx).map(|s| s.as_str()))
+                .or_else(|| DEFAULT_CHART_COLORS.get(idx % DEFAULT_CHART_COLORS.len()).copied())
+                .unwrap_or("4472C4"),
+        );
 
         s.push_str(&format!("<c:ser><c:idx val=\"{idx}\"/><c:order val=\"{idx}\"/>"));
         s.push_str(&gen_xml_ser_title(&ser.name));

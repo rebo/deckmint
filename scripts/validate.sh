@@ -5,7 +5,7 @@ echo "Building features.pptx..."
 cargo run --example features --quiet
 echo ""
 echo "=== Schema validation (OOXML SDK) ==="
-npx --yes @xarsh/ooxml-validator features.pptx
+npx --yes @xarsh/ooxml-validator@0.4.0 features.pptx
 echo ""
 echo "=== Repair-pattern validation ==="
 python3 scripts/check_pptx.py features.pptx

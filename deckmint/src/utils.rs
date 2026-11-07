@@ -43,11 +43,41 @@ pub fn rgb_to_hex(r: u8, g: u8, b: u8) -> String {
 
 /// Encode special XML characters
 pub fn encode_xml_entities(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
+    let mut encoded = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '&' => encoded.push_str("&amp;"),
+            '<' => encoded.push_str("&lt;"),
+            '>' => encoded.push_str("&gt;"),
+            '"' => encoded.push_str("&quot;"),
+            '\'' => encoded.push_str("&apos;"),
+            '\u{9}' | '\u{A}' | '\u{D}'
+            | '\u{20}'..='\u{D7FF}'
+            | '\u{E000}'..='\u{FFFD}'
+            | '\u{10000}'..='\u{10FFFF}' => encoded.push(ch),
+            _ => encoded.push('\u{FFFD}'),
+        }
+    }
+    encoded
+}
+
+/// Return an uppercase six-digit RGB color, falling back to black.
+pub(crate) fn safe_hex_color(color: &str) -> String {
+    let clean = color.trim_start_matches('#');
+    if is_hex_color(clean) {
+        clean.to_uppercase()
+    } else {
+        DEF_FONT_COLOR.to_string()
+    }
+}
+
+fn is_scheme_color(color: &str) -> bool {
+    matches!(
+        color,
+        "accent1" | "accent2" | "accent3" | "accent4" | "accent5" | "accent6"
+            | "bg1" | "bg2" | "dk1" | "dk2" | "folHlink" | "hlink"
+            | "lt1" | "lt2" | "phClr" | "tx1" | "tx2"
+    )
 }
 
 /// Generate a new UUID v4 string (uppercase, hyphenated)
@@ -59,14 +89,13 @@ pub fn new_uuid() -> String {
 /// `inner_elements` is optional XML content to nest inside the color tag.
 pub fn create_color_element(color_str: &str, inner_elements: Option<&str>) -> String {
     let clean = color_str.trim_start_matches('#');
-    let (is_hex, val) = if is_hex_color(clean) {
-        (true, clean.to_uppercase())
+    let (tag, val) = if is_hex_color(clean) {
+        ("srgbClr", clean.to_uppercase())
+    } else if is_scheme_color(clean) {
+        ("schemeClr", clean.to_string())
     } else {
-        // fall back to default if invalid
-        let v = if clean.is_empty() { DEF_FONT_COLOR.to_string() } else { clean.to_string() };
-        (false, v)
+        ("srgbClr", DEF_FONT_COLOR.to_string())
     };
-    let tag = if is_hex { "srgbClr" } else { "schemeClr" };
     match inner_elements {
         Some(inner) if !inner.is_empty() => {
             format!("<a:{tag} val=\"{val}\">{inner}</a:{tag}>")
@@ -76,7 +105,8 @@ pub fn create_color_element(color_str: &str, inner_elements: Option<&str>) -> St
 }
 
 /// Generate `<a:solidFill>...</a:solidFill>` XML for a color string or Color.
-/// Returns empty string for empty/invalid colors.
+/// Returns an empty string for an empty color and falls back to black for an
+/// invalid non-empty value.
 pub fn gen_xml_color_selection_str(color_str: &str, transparency: Option<f64>) -> String {
     let clean = color_str.trim_start_matches('#');
     if clean.is_empty() {
@@ -215,6 +245,7 @@ mod tests {
     fn test_encode_xml_entities() {
         assert_eq!(encode_xml_entities("a & b < c > d"), "a &amp; b &lt; c &gt; d");
         assert_eq!(encode_xml_entities("say \"hi\""), "say &quot;hi&quot;");
+        assert_eq!(encode_xml_entities("bad\0control"), "bad\u{FFFD}control");
     }
 
     #[test]
@@ -229,6 +260,14 @@ mod tests {
     #[test]
     fn test_create_color_element_scheme() {
         assert_eq!(create_color_element("accent1", None), "<a:schemeClr val=\"accent1\"/>");
+    }
+
+    #[test]
+    fn test_create_color_element_rejects_xml_injection() {
+        assert_eq!(
+            create_color_element("FF0000\"/><evil", None),
+            "<a:srgbClr val=\"000000\"/>"
+        );
     }
 
     #[test]

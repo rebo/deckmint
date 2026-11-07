@@ -10,7 +10,7 @@ keywords = ["powerpoint", "pptx", "presentation", "office", "ooxml"]
 categories = ["encoding", "parser-implementations"]
 
 [dependencies]
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 uuid = { version = "1", features = ["v4", "js"] }
 base64 = "0.22"
 imagesize = "0.13"
@@ -24,4 +24,4 @@ default = ["math"]
 math = ["dep:deckmint-math"]
 
 [dev-dependencies]
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }

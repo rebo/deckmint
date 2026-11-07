@@ -311,6 +311,9 @@ impl Slide {
     /// plain pixel grid, so they're a more reliable source of truth than
     /// parsing an arbitrary SVG's `viewBox`/`width`/`height` attributes.
     ///
+    /// The SVG bytes are embedded verbatim, not sanitized. Sanitize or rasterize
+    /// SVG supplied by an untrusted party before passing it to this method.
+    ///
     /// ```rust,no_run
     /// use deckmint::Presentation;
     /// use deckmint::objects::image::ImageOptionsBuilder;
